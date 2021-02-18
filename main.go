@@ -1,11 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
 
-func Sum(a int, b int) int {
-	return a + b
-}
+	"github.com/xmliszt/e-safe/foo"
+)
 
 func main() {
-	fmt.Println("Hello World!")
+	fmt.Println(foo.Foo(), foo.Sum(1,2))
 }
