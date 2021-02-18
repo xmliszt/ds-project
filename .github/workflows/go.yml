@@ -58,7 +58,4 @@ jobs:
 
       - name: Build
         run: |
-          echo go env GOPATH
-          cd $(go env GOPATH)/xmliszt/e-safe
-          ls
-          go build .
+          go build ./...
