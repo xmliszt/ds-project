@@ -1,7 +1,7 @@
 package foo
 
 func Foo() string {
-	return "hello"
+	return "world"
 }
 
 func Sum(a int, b int) int {
