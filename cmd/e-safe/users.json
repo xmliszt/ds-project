@@ -1,0 +1,33 @@
+{
+    "users": [
+      {
+        "Username": "DevBahl",
+        "Password": "Reader",
+        "Role": 4
+      },
+      {
+        "Username": "Jose",
+        "Password": "Reader",
+        "Role": 5
+
+      },
+      {
+        "Username": "Aaron",
+        "Password": "Reader",
+        "Role": 3
+
+      },
+      {
+        "Username": "JiaYi",
+        "Password": "Author",
+        "Role": 2
+
+      },
+      {
+        "Username": "Yuxuan",
+        "Password": "Reader",
+        "Role": 1
+
+      }
+    ]
+  }

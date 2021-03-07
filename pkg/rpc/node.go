@@ -19,25 +19,8 @@ func (n *Node) HandleMessageReceived() {
 	}
 }
 
-// GetUser obtains a specific user based on their username provided
-func (n Node) GetUser(username string) User {
-	return User{"User", "Pass", 2}
-}
-
-// CreateUser creates a user based on the User structure provided
-func (n Node) CreateUser(user User) {
-	fmt.Println("Hellu")
-}
-
-// SimpleMethod for testing
-func SimpleMethod() {
-	fmt.Println("Simple Method")
-}
-
-// GetUsers gets all  users
-func (n Node) GetUsers() []User {
-	// user1 = User{"user1", "password1", 1}
-	// user2 = User{"user2", "password2", 1}
-	var userList = []User{User{"user2", "password2", 1}, User{"user2", "password2", 1}}
-	return userList
-}
+// Start is the initializing function for the node
+// func (n *Node) Start() error {
+// 	// do whatever thing required for each node to start
+// 	go n.HandleMessageReceived()
+// }
