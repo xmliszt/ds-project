@@ -1,9 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"github.com/xmliszt/e-safe/pkg/locksmith"
 )
 
 func main() {
-	fmt.Println("Hellow World!")
+	locksmithServer := locksmith.InitializeLocksmith(5)
+	go locksmithServer.Node.HandleMessageReceived()
+	locksmithServer.StartAllNodes()
+	go locksmithServer.MonitorNodes()
 }
