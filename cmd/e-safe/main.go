@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	locksmith.InitializeLocksmith(5)
+	locksmith.InitializeLocksmith()
 }

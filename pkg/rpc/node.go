@@ -2,8 +2,6 @@ package rpc
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
 )
 
 type Node struct {
@@ -14,21 +12,22 @@ type Node struct {
 	SendChannel chan Data 		// Sending channel
 	RpcMap map[int]chan Data		// Map node ID to their receiving channels
 }
+
 // green part
-// Go Routine to handle the messages received
+// HandleMessageReceived is a Go routine that handles the messages received
 func (n *Node) HandleMessageReceived() {
 	for {
 		select {
 		case msg, ok := <-n.RecvChannel:
 			if ok {
-				time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
-				fmt.Printf("Node [%d] receive: %v\n", n.Pid, msg)
-				if msg.Payload["Hello"] == "world" {
+				switch msg.Payload["type"] {
+				case "CHECK_HEARTBEAT":
 					n.SendSignal(0, Data{
 						From: n.Pid,
 						To: 0,
 						Payload: map[string]interface{}{
-							"data": fmt.Sprintf("Hi there! Greeting from Node [%d]", n.Pid),
+							"type": "REPLY_HEARTBEAT",
+							"data": false,
 						},
 					})
 				}
@@ -39,28 +38,15 @@ func (n *Node) HandleMessageReceived() {
 			continue
 		}
 	}
-	// for msg := range n.RecvChannel {
-	// 	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
-	// 	fmt.Printf("Node [%d] receive: %v\n", n.Pid, msg)
-	// 	if msg.Payload["Hello"] == "world" {
-	// 		n.SendSignal(0, Data{
-	// 			From: n.Pid,
-	// 			To: 0,
-	// 			Payload: map[string]interface{}{
-	// 				"data": fmt.Sprintf("Hi there! Greeting from Node [%d]", n.Pid),
-	// 			},
-	// 		})
-	// 	}
-	// }
 }
 
-// Start up a node, running receiving channel
+// Start starts up a node, running receiving channel
 func (n *Node) Start() {
 	fmt.Printf("Node [%d] has started!\n", n.Pid)
 	go n.HandleMessageReceived()
 }
 
-// Terminate node, close all channels
+// TearDown terminates node, closes all channels
 func (n *Node) TearDown() {
 	close(n.RecvChannel)
 	close(n.SendChannel)

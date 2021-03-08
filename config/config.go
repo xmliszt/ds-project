@@ -18,11 +18,12 @@ type ConfigServer struct {
 
 type ConfigNode struct {
 	Number int `yaml:"Number"`
+	HeartbeatInterval int `yaml:"HeartbeatInterval"`
 }
 
-var configPath = "../config.yaml"
+var configPath = "./config.yaml"
 
-// It loads the config from YAML file and return the config object
+// LoadConfig loads the config from YAML file and return the config object
 func LoadConfig() (*Config, error) {
 	cfg := &Config{}
 
@@ -41,7 +42,7 @@ func LoadConfig() (*Config, error) {
 	return cfg, nil
 }
 
-// Custom compare function for nested struct
+// IsEqual compares nested struct
 func (config *Config) IsEqual(xConfig *Config) bool {
 	return config.ConfigServer == xConfig.ConfigServer && config.ConfigNode == xConfig.ConfigNode 
 }

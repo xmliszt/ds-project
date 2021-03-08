@@ -11,6 +11,7 @@ var expectedConfig = &Config{
 	},
 	ConfigNode: ConfigNode{
 		Number: 5,
+		HeartbeatInterval: 5,
 	},
 }
 

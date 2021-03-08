@@ -3,3 +3,4 @@ Server:
   Port: 8080
 Node:
   Number: 5
+  HeartbeatInterval: 5 # check heartbeat every n seconds
