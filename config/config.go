@@ -1,8 +1,8 @@
 package config
 
 import (
-	"fmt"
 	"os"
+	"path"
 	"sync"
 
 	"gopkg.in/yaml.v2"
@@ -29,13 +29,11 @@ type ConfigTimeout struct {
 	NodeCreationTimeout int `yaml:"NodeCreationTimeout"`
 }
 
-var configPath = "../config.yaml"
-
 // LoadConfig loads the config from YAML file and return the config object
-func LoadConfig() (*Config, error) {
+func LoadConfig(path string) (*Config, error) {
 	cfg := &Config{}
 
-	file, err := os.Open(configPath)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +58,13 @@ func GetConfig() (*Config, error) {
 		lock.Lock()
 		defer lock.Unlock()
 		if globalConfig == nil {
-			config, err := LoadConfig()
+			cwd, err := os.Getwd()
 			if err != nil {
-				fmt.Println(err)
+				return nil, err
+			}
+			configPath := path.Join(cwd, "config.yaml")
+			config, err := LoadConfig(configPath)
+			if err != nil {
 				return nil, err
 			}
 			globalConfig = config

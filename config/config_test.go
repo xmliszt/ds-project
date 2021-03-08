@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path"
 	"testing"
 )
 
@@ -20,7 +22,13 @@ var expectedConfig = &Config{
 }
 
 func TestLoadConfig(t *testing.T) {
-	config, err := LoadConfig()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+	rootPath, _ := path.Split(cwd)
+	configPath := path.Join(rootPath, "config.yaml")
+	config, err := LoadConfig(configPath)
 	if err != nil {
 		t.Error(err)
 	}
