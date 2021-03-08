@@ -6,12 +6,12 @@ import (
 )
 
 type Node struct {
-	IsCoordinator bool
-	Pid int											// Node ID
-	Ring []int										// Ring structure of nodes
-	RecvChannel chan Data		// Receiving channel
-	SendChannel chan Data 		// Sending channel
-	RpcMap map[int]chan Data		// Map node ID to their receiving channels
+	IsCoordinator *bool `validate:"required"`
+	Pid int `validate:"gte=0"` 											// Node ID
+	Ring []int `validate:"required"`								// Ring structure of nodes
+	RecvChannel chan *Data	`validate:"required"`			// Receiving channel
+	SendChannel chan *Data `validate:"required"`			// Sending channel
+	RpcMap map[int]chan *Data `validate:"required"`	// Map node ID to their receiving channels
 }
 
 // green part
@@ -29,7 +29,7 @@ func (n *Node) HandleMessageReceived() {
 	for msg := range n.RecvChannel {
 		switch msg.Payload["type"] {
 		case "CHECK_HEARTBEAT":
-			n.SendSignal(0, Data{
+			n.SendSignal(0, &Data{
 				From: n.Pid,
 				To: 0,
 				Payload: map[string]interface{}{
