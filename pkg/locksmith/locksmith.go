@@ -11,20 +11,18 @@ import (
 type LockSmith struct {
 	Node rpc.Node
 	Nodes []*rpc.Node
-	NodeNumber int
 	HeartBeatTable map[int]bool
 }
 
 // InitializeLocksmith initializes the Locksmith Server
 func InitializeLocksmith() error {
-	config, err := config.LoadConfig()
+	config, err := config.GetConfig()
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	n := config.Number
-	receivingChannel := make(chan rpc.Data, n+1)
-	sendingChannel := make(chan rpc.Data, n+1)
+	receivingChannel := make(chan rpc.Data, 1)
+	sendingChannel := make(chan rpc.Data, 1)
 	locksmithServer := &LockSmith{
 		Node: rpc.Node{
 			IsCoordinator: false,
@@ -32,7 +30,6 @@ func InitializeLocksmith() error {
 			RecvChannel: receivingChannel,
 			SendChannel: sendingChannel,
 		},
-		NodeNumber: n,
 	}
 
 	locksmithServer.HeartBeatTable = make(map[int]bool)
@@ -43,8 +40,8 @@ func InitializeLocksmith() error {
 	rpcMap[0] = receivingChannel	// Add Locksmith receiving channel to RpcMap
 
 	for i := 1; i <= n; i ++ {
-		nodeRecvChan := make(chan rpc.Data, n+1)
-		nodeSendChan := make(chan rpc.Data, n+1)
+		nodeRecvChan := make(chan rpc.Data, 1)
+		nodeSendChan := make(chan rpc.Data, 1)
 		newNode := &rpc.Node{
 			IsCoordinator: false,
 			Pid: i,
@@ -62,44 +59,31 @@ func InitializeLocksmith() error {
 	for _, node := range locksmithServer.Nodes {
 		node.Ring = ring
 		node.RpcMap = rpcMap
-		fmt.Printf("Node [%d] recv channel: %v\n", node.Pid, node.RecvChannel)
 	}
 
 	locksmithServer.StartAllNodes()	// Spin up all created nodes
-
-	go locksmithServer.CheckHeartbeat(config.HeartbeatInterval)	// Start periodically checking Node's heartbeat
-	
+	fmt.Println("Locksmith [0] has started")
+	go locksmithServer.CheckHeartbeat()	// Start periodically checking Node's heartbeat
 	locksmithServer.HandleMessageReceived()	// Run this as the main go routine, so do not need to create separate go routine
+
 	return nil
 }
 
 // HandleMessageReceived is a Go Routine to handle the messages received
-func (n *LockSmith) HandleMessageReceived() {
-	for {
-		select {
-		case msg, ok := <-n.Node.RecvChannel:
-			if ok {
-				switch msg.Payload["type"] {
-				case "REPLY_HEARTBEAT":
-					alive := msg.Payload["data"].(bool)
-					if !alive {
-						n.updateHeartbeatTable(msg.From, alive)
-					}
-				}
-			} else {
-				continue
-			}
-		default:
-			continue
+func (locksmith *LockSmith) HandleMessageReceived() {
+	for msg := range locksmith.Node.RecvChannel {
+		switch msg.Payload["type"] {
+		case "REPLY_HEARTBEAT":
+			locksmith.HeartBeatTable[msg.From] = true
 		}
 	}
 }
 
 // TearDown terminates node, closes all channels
-func (n *LockSmith) TearDown() {
-	close(n.Node.RecvChannel)
-	close(n.Node.SendChannel)
-	fmt.Printf("Locksmith Server [%d] has terminated!\n", n.Node.Pid)
+func (locksmith *LockSmith) TearDown() {
+	close(locksmith.Node.RecvChannel)
+	close(locksmith.Node.SendChannel)
+	fmt.Printf("Locksmith Server [%d] has terminated!\n", locksmith.Node.Pid)
 }
 
 // StartAllNodes starts up all created nodes
@@ -118,27 +102,35 @@ func (locksmit *LockSmith) EndAllNodes() {
 }
 
 // CheckHeartbeat periodically check if node is alive
-func (locksmith *LockSmith) CheckHeartbeat(interval int) {
-	for _, pid := range locksmith.Node.Ring {
-		time.Sleep(time.Second * time.Duration(interval))
-		locksmith.Node.SendSignal(pid, rpc.Data{
-			From: locksmith.Node.Pid,
-			To: pid,
-			Payload: map[string]interface{}{
-				"type": "CHECK_HEARTBEAT",
-				"data": nil,
-			},
-		})
+func (locksmith *LockSmith) CheckHeartbeat() {
+	config, err := config.GetConfig()
+	if err != nil {
+		fmt.Println("Fatal: Heartbeat checking has crashed. Reason: ", err)
+		return
 	}
-}
-
-// updateHeartbeatTable updates the heartbeat table
-func (locksmith *LockSmith) updateHeartbeatTable(pid int, val bool) {
-	table := locksmith.HeartBeatTable
-	fmt.Println(table, locksmith.HeartBeatTable)
-	if oldVal, ok := table[pid]; ok {
-		if oldVal != val {
-			table[pid] = val
+	for {
+		for _, pid := range locksmith.Node.Ring {
+			time.Sleep(time.Second * time.Duration(config.HeartbeatInterval))
+			go func(pid int) {
+				locksmith.HeartBeatTable[pid] = false
+				locksmith.Node.SendSignal(pid, rpc.Data{
+					From: locksmith.Node.Pid,
+					To: pid,
+					Payload: map[string]interface{}{
+						"type": "CHECK_HEARTBEAT",
+						"data": nil,
+					},
+				})
+				time.Sleep(time.Second * 1)
+				fmt.Println("Hearbeat Table: ", locksmith.HeartBeatTable)
+				if !locksmith.HeartBeatTable[pid] {
+					time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
+					if !locksmith.HeartBeatTable[pid] {
+						fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
+						time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout))	// allow sufficient time for node to restart, then resume heartbeat checking
+					}
+				}
+			}(pid)
 		}
 	}
 }

@@ -13,6 +13,10 @@ var expectedConfig = &Config{
 		Number: 5,
 		HeartbeatInterval: 5,
 	},
+	ConfigTimeout: ConfigTimeout{
+		HeartBeatTimeout: 15,
+		NodeCreationTimeout: 60,
+	},
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -20,7 +24,7 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !config.IsEqual(expectedConfig) {
+	if !(config.ConfigServer == expectedConfig.ConfigServer && config.ConfigNode == expectedConfig.ConfigNode) {
 		t.Errorf("Expected: %v, instead received: %v", expectedConfig, config)
 	}
 }

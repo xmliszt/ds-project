@@ -1,6 +1,8 @@
 package rpc
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Signal interface {
 	SendSignal(pid int, data map[string]interface{}) 
@@ -12,7 +14,12 @@ type Signal interface {
 // 2. send check heartbeat signals to each node
 // 3. pass updated heartbeat table to coordinator node
 func (n Node) SendSignal(pid int, data Data) {
+	defer func(){
+		if r := recover(); r != nil {
+			fmt.Println(r)
+		}
+	}()
+	fmt.Printf("[%d] -> [%d]: %v\n", n.Pid, pid, data)
 	sendingChannel := n.RpcMap[pid]
-	fmt.Printf("Send to Node [%d] recv channel: %v\n", pid, sendingChannel)
 	sendingChannel <- data
 }
