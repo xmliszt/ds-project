@@ -2,7 +2,7 @@ package config
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 )
 
@@ -26,8 +26,8 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	rootPath, _ := path.Split(cwd)
-	configPath := path.Join(rootPath, "config.yaml")
+	rootPath, _ := filepath.Split(cwd)
+	configPath := filepath.Join(rootPath, "config.yaml")
 	config, err := LoadConfig(configPath)
 	if err != nil {
 		t.Errorf("Error opening config! ERROR: %v | Config File Path: %s", err, configPath)

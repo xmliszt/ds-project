@@ -2,7 +2,7 @@ package config
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 
 	"gopkg.in/yaml.v2"
@@ -62,7 +62,7 @@ func GetConfig() (*Config, error) {
 			if err != nil {
 				return nil, err
 			}
-			configPath := path.Join(cwd, "config.yaml")
+			configPath := filepath.Join(cwd, "config.yaml")
 			config, err := LoadConfig(configPath)
 			if err != nil {
 				return nil, err
