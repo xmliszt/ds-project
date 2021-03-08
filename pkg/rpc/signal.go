@@ -9,8 +9,7 @@ type Signal interface {
 // 1. send election signal to new coordinator
 // 2. send check heartbeat signals to each node
 // 3. pass updated heartbeat table to coordinator node
-func (n Node) SendSignal(pid int, data map[string]interface{}) {
+func (n Node) SendSignal(pid int, data Data) {
 	sendingChannel := n.RpcMap[pid]
-	data["from"] = n.Pid
 	sendingChannel <- data
 }

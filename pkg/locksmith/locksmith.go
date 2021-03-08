@@ -2,7 +2,8 @@ package locksmith
 
 import (
 	"fmt"
-	"sync"
+	"math/rand"
+	"time"
 
 	"github.com/xmliszt/e-safe/pkg/rpc"
 )
@@ -15,13 +16,11 @@ type LockSmith struct {
 }
 
 // Initialize Locksmith Server
-func InitializeLocksmith(n int) *LockSmith {
-	wg := &sync.WaitGroup{}
-	receivingChannel := make(chan map[string]interface{}, 10)
-	sendingChannel := make(chan map[string]interface{}, 10)
+func InitializeLocksmith(n int) {
+	receivingChannel := make(chan rpc.Data)
+	sendingChannel := make(chan rpc.Data)
 	locksmithServer := &LockSmith{
 		Node: rpc.Node{
-			Wg: wg,
 			IsCoordinator: false,
 			Pid: 0,
 			RecvChannel: receivingChannel,
@@ -33,23 +32,22 @@ func InitializeLocksmith(n int) *LockSmith {
 	locksmithServer.HeartBeatTable = make(map[int]bool)
 
 	ring := make([]int, 0)
-	rpcMap := make(map[int]chan map[string]interface{})
+	rpcMap := make(map[int]chan rpc.Data)
 
 	rpcMap[0] = receivingChannel	// Add Locksmith receiving channel to RpcMap
 
-	for i := 0; i < n; i ++ {
-		nodeRecvChan := make(chan map[string]interface{}, 10)
-		nodeSendChan := make(chan map[string]interface{}, 10)
+	for i := 1; i <= n; i ++ {
+		nodeRecvChan := make(chan rpc.Data)
+		nodeSendChan := make(chan rpc.Data)
 		newNode := &rpc.Node{
-			Wg: wg,
 			IsCoordinator: false,
-			Pid: i+1,
+			Pid: i,
 			RecvChannel: nodeRecvChan,
 			SendChannel: nodeSendChan,
 		}
-		ring = append(ring, i+1)
+		ring = append(ring, i)
 		locksmithServer.Nodes = append(locksmithServer.Nodes, newNode)
-		rpcMap[i+1] = nodeRecvChan
+		rpcMap[i] = nodeRecvChan
 	}
 
 	locksmithServer.Node.Ring = ring
@@ -60,24 +58,50 @@ func InitializeLocksmith(n int) *LockSmith {
 		node.RpcMap = rpcMap
 	}
 
-	return locksmithServer
+	locksmithServer.StartAllNodes()	// Spin up all created nodes
+
+	for _, pid := range locksmithServer.Node.Ring {
+		time.Sleep(time.Microsecond * time.Duration(rand.Intn(1000)))
+		locksmithServer.Node.SendSignal(pid, rpc.Data{
+			From: locksmithServer.Node.Pid,
+			To: pid,
+			Payload: map[string]interface{}{
+				"Hello": "world",
+				"Age": 120,
+			},
+		})
+	}
+
+	locksmithServer.HandleMessageReceived()	// Run this as the main go routine, so do not need to create separate go routine
 }
 
+// Go Routine to handle the messages received
+func (n *LockSmith) HandleMessageReceived() {
+	for msg := range n.Node.RecvChannel {
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
+		fmt.Println("Locksmith receive: ", msg)
+	}
+}
+
+// Terminate node, close all channels
+func (n *LockSmith) TearDown() {
+	close(n.Node.RecvChannel)
+	close(n.Node.SendChannel)
+	fmt.Printf("Locksmith Server [%d] has terminated!\n", n.Node.Pid)
+}
 
 // Call this function at the initialization
 // Start up all created nodes
 func (locksmith *LockSmith) StartAllNodes() {
 	for _, node := range locksmith.Nodes {
-		locksmith.Node.Wg.Add(1)
 		node.Start()
 		locksmith.HeartBeatTable[node.Pid] = true
 	}
 }
 
-// Wait for all nodes to finish and exit
-func (locksmith *LockSmith) MonitorNodes() {
-	locksmith.Node.Wg.Wait()
-	close(locksmith.Node.RecvChannel)
-	close(locksmith.Node.SendChannel)
-	fmt.Println("Teardown complete! ")
+// Start teardown process of all created nodes
+func (locksmit *LockSmith) EndAllNodes() {
+	for _, node := range locksmit.Nodes {
+		node.TearDown()
+	}
 }

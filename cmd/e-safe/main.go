@@ -5,8 +5,5 @@ import (
 )
 
 func main() {
-	locksmithServer := locksmith.InitializeLocksmith(5)
-	go locksmithServer.Node.HandleMessageReceived()
-	locksmithServer.StartAllNodes()
-	go locksmithServer.MonitorNodes()
+	locksmith.InitializeLocksmith(5)
 }

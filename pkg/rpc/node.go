@@ -2,25 +2,34 @@ package rpc
 
 import (
 	"fmt"
-	"sync"
+	"math/rand"
+	"time"
 )
 
 type Node struct {
-	Wg *sync.WaitGroup
 	IsCoordinator bool
 	Pid int											// Node ID
 	Ring []int										// Ring structure of nodes
-	RecvChannel chan map[string]interface{}			// Receiving channel
-	SendChannel chan map[string]interface{} 		// Sending channel
-	RpcMap map[int]chan map[string]interface{}		// Map node ID to their receiving channels
+	RecvChannel chan Data		// Receiving channel
+	SendChannel chan Data 		// Sending channel
+	RpcMap map[int]chan Data		// Map node ID to their receiving channels
 }
 // green part
 // Go Routine to handle the messages received
 func (n *Node) HandleMessageReceived() {
 	for msg := range n.RecvChannel {
-		fmt.Println("I receive: ", msg)
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
+		fmt.Printf("Node [%d] receive: %v\n", n.Pid, msg)
+		if msg.Payload["Hello"] == "world" {
+			n.SendSignal(0, Data{
+				From: n.Pid,
+				To: 0,
+				Payload: map[string]interface{}{
+					"data": fmt.Sprintf("Hi there! Greeting from Node [%d]", n.Pid),
+				},
+			})
+		}
 	}
-	defer n.TearDown()
 }
 
 // Start up a node, running receiving channel
@@ -33,6 +42,5 @@ func (n *Node) Start() {
 func (n *Node) TearDown() {
 	close(n.RecvChannel)
 	close(n.SendChannel)
-	n.Wg.Done()
 	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
 }
