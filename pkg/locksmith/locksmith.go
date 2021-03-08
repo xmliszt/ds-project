@@ -71,16 +71,29 @@ func InitializeLocksmith(n int) {
 			},
 		})
 	}
-
 	locksmithServer.HandleMessageReceived()	// Run this as the main go routine, so do not need to create separate go routine
 }
 
 // Go Routine to handle the messages received
 func (n *LockSmith) HandleMessageReceived() {
-	for msg := range n.Node.RecvChannel {
-		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
-		fmt.Println("Locksmith receive: ", msg)
+	for {
+		select {
+		case msg, ok := <-n.Node.RecvChannel:
+			if ok {
+				time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
+				fmt.Println("Locksmith receive: ", msg)
+				
+			} else {
+				continue
+			}
+		default:
+			continue
+		}
 	}
+	// for msg := range n.Node.RecvChannel {
+	// 	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
+	// 	fmt.Println("Locksmith receive: ", msg)
+	// }
 }
 
 // Terminate node, close all channels

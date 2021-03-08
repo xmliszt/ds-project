@@ -17,19 +17,41 @@ type Node struct {
 // green part
 // Go Routine to handle the messages received
 func (n *Node) HandleMessageReceived() {
-	for msg := range n.RecvChannel {
-		time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
-		fmt.Printf("Node [%d] receive: %v\n", n.Pid, msg)
-		if msg.Payload["Hello"] == "world" {
-			n.SendSignal(0, Data{
-				From: n.Pid,
-				To: 0,
-				Payload: map[string]interface{}{
-					"data": fmt.Sprintf("Hi there! Greeting from Node [%d]", n.Pid),
-				},
-			})
+	for {
+		select {
+		case msg, ok := <-n.RecvChannel:
+			if ok {
+				time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
+				fmt.Printf("Node [%d] receive: %v\n", n.Pid, msg)
+				if msg.Payload["Hello"] == "world" {
+					n.SendSignal(0, Data{
+						From: n.Pid,
+						To: 0,
+						Payload: map[string]interface{}{
+							"data": fmt.Sprintf("Hi there! Greeting from Node [%d]", n.Pid),
+						},
+					})
+				}
+			} else {
+				continue
+			}
+		default:
+			continue
 		}
 	}
+	// for msg := range n.RecvChannel {
+	// 	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)))
+	// 	fmt.Printf("Node [%d] receive: %v\n", n.Pid, msg)
+	// 	if msg.Payload["Hello"] == "world" {
+	// 		n.SendSignal(0, Data{
+	// 			From: n.Pid,
+	// 			To: 0,
+	// 			Payload: map[string]interface{}{
+	// 				"data": fmt.Sprintf("Hi there! Greeting from Node [%d]", n.Pid),
+	// 			},
+	// 		})
+	// 	}
+	// }
 }
 
 // Start up a node, running receiving channel
