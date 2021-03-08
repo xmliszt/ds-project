@@ -30,7 +30,7 @@ func TestLoadConfig(t *testing.T) {
 	configPath := path.Join(rootPath, "config.yaml")
 	config, err := LoadConfig(configPath)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("Error opening config! ERROR: %v | Config File Path: %s", err, configPath)
 	}
 	if !(config.ConfigServer == expectedConfig.ConfigServer && config.ConfigNode == expectedConfig.ConfigNode) {
 		t.Errorf("Expected: %v, instead received: %v", expectedConfig, config)
