@@ -50,15 +50,12 @@ func TestHandleMessageReceived(t *testing.T) {
 		HeartBeatTable: make(map[int]bool),
 	}
 	locksmith.HeartBeatTable[1] = false
-	go func(){
-		time.Sleep(time.Second * 1)
-		locksmith.Node.RecvChannel <- &rpc.Data{From: 1, Payload: map[string]interface{}{"type": "REPLY_HEARTBEAT"}}
-	}()
-	go func(){locksmith.HandleMessageReceived()
-		if !locksmith.HeartBeatTable[1] {
-			t.Errorf("Expected HeartbeatTable for Node 1 to be true, but instead it is still false.")
-		}
-	}()
+	go locksmith.HandleMessageReceived()
+	locksmith.Node.RecvChannel <- &rpc.Data{From: 1, Payload: map[string]interface{}{"type": "REPLY_HEARTBEAT"}}
+	time.Sleep(time.Second * 1)
+	if !locksmith.HeartBeatTable[1] {
+		t.Errorf("Expected HeartbeatTable for Node 1 to be true, but instead it is still false.")
+	}
 }
 
 // Expected 3 nodes to spin up and heartbeat table all update to true

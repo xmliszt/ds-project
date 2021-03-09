@@ -16,11 +16,9 @@ func TestHandleMessageReceived(t *testing.T) {
 	go func(){
 		node.RecvChannel <- &Data{From: 0, Payload: map[string]interface{}{"type": "CHECK_HEARTBEAT"}}
 	}()
-	go func(){
-		for msg := range mockRecvChannel {
-			if msg.From != 999 || msg.To != 0 || msg.Payload["type"] != "REPLY_HEARTBEAT" {
-				t.Error("Node failed to handle CHECK_HEARTBEAT message.")
-			}
-		}
-	}()
+	go node.HandleMessageReceived()
+	msg := <- mockRecvChannel 
+	if msg.From != 999 || msg.To != 0 || msg.Payload["type"] != "REPLY_HEARTBEAT" {
+		t.Error("Node failed to handle CHECK_HEARTBEAT message. Received: ", msg)
+	}
 }

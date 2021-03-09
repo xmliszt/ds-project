@@ -19,11 +19,8 @@ func TestSendSignal(t *testing.T) {
 			},
 		})
 	}()
-	go func(){
-		for msg := range channel {
-			if msg.From != 999 || msg.To != 555 || msg.Payload["type"] != "test" {
-				t.Errorf("SendSignal has sending error! Received %v instead!", msg)
-			}
-		}
-	}()
+	msg := <- channel
+	if msg.From != 999 || msg.To != 555 || msg.Payload["type"] != "test" {
+		t.Errorf("SendSignal has sending error! Received %v instead!", msg)
+	}
 }
