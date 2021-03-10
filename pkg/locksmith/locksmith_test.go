@@ -21,14 +21,14 @@ func TestInitializeLocksmith(t *testing.T) {
 // Expected n nodes to be initialized with all required fields
 func TestInitializeNodes(t *testing.T) {
 	locksmith := &LockSmith{
-		Node: &rpc.Node{
+		LockSmithNode: &rpc.Node{
 			Ring: make([]int, 0),
 			RpcMap: make(map[int]chan *rpc.Data),
 		},
 		Nodes: make([]*rpc.Node, 0),
 	}
 	locksmith.InitializeNodes(3)
-	if len(locksmith.Nodes) < 3 || len(locksmith.Node.Ring) < 3 || len(locksmith.Node.RpcMap) < 3 {
+	if len(locksmith.Nodes) < 3 || len(locksmith.LockSmithNode.Ring) < 3 || len(locksmith.LockSmithNode.RpcMap) < 3 {
 		t.Errorf("Expected 3 nodes to be created, but have incomplete creation: %d", len(locksmith.Nodes))
 	}
 	for _, node := range locksmith.Nodes {
@@ -44,14 +44,14 @@ func TestInitializeNodes(t *testing.T) {
 func TestHandleMessageReceived(t *testing.T) {
 	receivingChannel := make(chan *rpc.Data, 1)
 	locksmith := &LockSmith{
-		Node: &rpc.Node{
+		LockSmithNode: &rpc.Node{
 			RecvChannel: receivingChannel,
 		},
 		HeartBeatTable: make(map[int]bool),
 	}
 	locksmith.HeartBeatTable[1] = false
 	go locksmith.HandleMessageReceived()
-	locksmith.Node.RecvChannel <- &rpc.Data{From: 1, Payload: map[string]interface{}{"type": "REPLY_HEARTBEAT"}}
+	locksmith.LockSmithNode.RecvChannel <- &rpc.Data{From: 1, Payload: map[string]interface{}{"type": "REPLY_HEARTBEAT"}}
 	time.Sleep(time.Second * 1)
 	if !locksmith.HeartBeatTable[1] {
 		t.Errorf("Expected HeartbeatTable for Node 1 to be true, but instead it is still false.")
