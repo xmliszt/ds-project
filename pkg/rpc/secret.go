@@ -5,7 +5,7 @@ import (
 )
 
 type Secret struct {
-	Key   int
+	// Key   int
 	Value string // Value of secret
 	Role  int    // Int to identify role (clearance level)
 }
