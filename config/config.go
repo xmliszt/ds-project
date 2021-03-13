@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"path/filepath"
+	"sync"
 
 	"gopkg.in/yaml.v2"
 )
@@ -9,6 +11,7 @@ import (
 type Config struct {
 	ConfigServer `yaml:"Server"`
 	ConfigNode `yaml:"Node"`
+	ConfigTimeout `yaml:"Timeout"`
 }
 
 type ConfigServer struct {
@@ -18,15 +21,19 @@ type ConfigServer struct {
 
 type ConfigNode struct {
 	Number int `yaml:"Number"`
+	HeartbeatInterval int `yaml:"HeartbeatInterval"`
 }
 
-var configPath = "../config.yaml"
+type ConfigTimeout struct {
+	HeartBeatTimeout int `yaml:"HeartbeatTimeout"`
+	NodeCreationTimeout int `yaml:"NodeCreationTimeout"`
+}
 
-// It loads the config from YAML file and return the config object
-func LoadConfig() (*Config, error) {
+// LoadConfig loads the config from YAML file and return the config object
+func LoadConfig(path string) (*Config, error) {
 	cfg := &Config{}
 
-	file, err := os.Open(configPath)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +48,27 @@ func LoadConfig() (*Config, error) {
 	return cfg, nil
 }
 
-// Custom compare function for nested struct
-func (config *Config) IsEqual(xConfig *Config) bool {
-	return config.ConfigServer == xConfig.ConfigServer && config.ConfigNode == xConfig.ConfigNode 
-}
+var lock = &sync.Mutex{}
 
+var globalConfig *Config
+
+// GetConfig is a singleton method that gets the loaded configuration object
+func GetConfig() (*Config, error) {
+	if globalConfig == nil {
+		lock.Lock()
+		defer lock.Unlock()
+		if globalConfig == nil {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return nil, err
+			}
+			configPath := filepath.Join(cwd, "config.yaml")
+			config, err := LoadConfig(configPath)
+			if err != nil {
+				return nil, err
+			}
+			globalConfig = config
+		}
+	}
+	return globalConfig, nil
+}
