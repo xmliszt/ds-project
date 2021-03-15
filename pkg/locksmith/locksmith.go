@@ -125,6 +125,8 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 					if !locksmith.HeartBeatTable[pid] {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.HeartBeatTable[pid] {
+							// TODO: Teardown the particular node in the Nodes
+
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
 
 							// Election process
@@ -144,11 +146,15 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 
 							fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 
-							// found := util.IntInSlice(locksmith.DeadNode, pid)
-							// if !found {
-							// 	locksmith.DeadNode = append(locksmith.DeadNode, pid)
-							// }
-							// locksmith.SpawnNewNode(pid)
+							// Restart all dead nodes
+							for k, v := range locksmith.HeartBeatTable {
+								if !v {
+									locksmith.SpawnNewNode(k)
+									fmt.Printf("Node [%d] has been revived!\n", k)
+									fmt.Println("HHH", locksmith.HeartBeatTable)
+								}
+							}
+
 							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout))	// allow sufficient time for node to restart, then resume heartbeat checking
 						}
 					}
@@ -158,41 +164,19 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 		}
 	}
 
-// Check if a node is dead
-// func (locksmith *LockSmith) DeadNodeChecker() {
-// 	config, err := config.GetConfig()
-// 	if err != nil {
-// 		fmt.Println("Fatal: Heartbeat checking has crashed. Reason: ", err)
-// 		return
-// 	}
 
-// 	var potentialCandidate []int
+// Spawn new nodes when a node is down
+// TODO: change relevant fields if simulating dead node is different in the future
+func (locksmith *LockSmith) SpawnNewNode(n int) {
+		found := util.IntInSlice(locksmith.LockSmithNode.Ring, n)
 
-// 	// Check what is the dead node, and assign the remaining alive node with the highest pid as coordinator
-// 	if len(locksmith.DeadNode) != 0 {
-// 		for idx := 1; idx <= config.Number; idx++ {
-// 			found := util.IntInSlice(locksmith.DeadNode, idx)
-// 				if !found {
-// 					potentialCandidate = append(potentialCandidate, idx)
-// 				}
-// 				// TODO: spawn node here and remove from deadnode list
-// 		}
-// 	}
-// 	coordinator := util.FindMax(potentialCandidate)
-// 	locksmith.Election(coordinator)
-	
-// }
+		if !found {
+			locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, n)
+		}
 
-// // locksmith elects new node coordinator
-// func (locksmith *LockSmith) Election(pid int) {
+		locksmith.HeartBeatTable[n] = true
 
-// }
-
-// // Spawn new nodes when a node is down
-// func (locksmith *LockSmith) SpawnNewNode(pid int) {
-	
-// }
-
+}
 
 // TearDown terminates node, closes all channels
 func (locksmith *LockSmith) TearDown() {
