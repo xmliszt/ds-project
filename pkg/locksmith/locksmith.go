@@ -164,12 +164,11 @@ func (locksmith *LockSmith) Election() {
 	locksmith.Coordinator = coordinator
 
 	isCoordinator := true
-	locksmith.LockSmithNode.IsCoordinator = &isCoordinator
+	locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
 
 	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }
 // Spawn new nodes when a node is down
-// TODO: change relevant fields if simulating dead node is different in the future
 func (locksmith *LockSmith) SpawnNewNode(n int) {
 	nodeRecvChan := make(chan *rpc.Data, 1)
 	nodeSendChan := make(chan *rpc.Data, 1)
