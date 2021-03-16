@@ -9,9 +9,9 @@ import (
 )
 
 type LockSmith struct {
-	LockSmithNode *rpc.Node `validate:"required"`
-	Nodes []*rpc.Node `validate:"required"`
-	HeartBeatTable map[int]bool `validate:"required"`
+	LockSmithNode  *rpc.Node         `validate:"required"`
+	Nodes          map[int]*rpc.Node `validate:"required"`
+	HeartBeatTable map[int]bool      `validate:"required"`
 }
 
 // Start is the main function that starts the entire program
@@ -26,8 +26,8 @@ func Start() error {
 	locksmithServer.StartAllNodes()
 
 	fmt.Println("Locksmith [0] has started")
-	go locksmithServer.CheckHeartbeat()	// Start periodically checking Node's heartbeat
-	locksmithServer.HandleMessageReceived()	// Run this as the main go routine, so do not need to create separate go routine
+	go locksmithServer.CheckHeartbeat()     // Start periodically checking Node's heartbeat
+	locksmithServer.HandleMessageReceived() // Run this as the main go routine, so do not need to create separate go routine
 
 	return nil
 }
@@ -40,36 +40,36 @@ func InitializeLocksmith() *LockSmith {
 	locksmithServer := &LockSmith{
 		LockSmithNode: &rpc.Node{
 			IsCoordinator: &isCoordinator,
-			Pid: 0,
-			RecvChannel: receivingChannel,
-			SendChannel: sendingChannel,
-			Ring: make([]int, 0),
-			RpcMap: make(map[int]chan *rpc.Data),
+			Pid:           0,
+			RecvChannel:   receivingChannel,
+			SendChannel:   sendingChannel,
+			Ring:          make([]int, 0),
+			RpcMap:        make(map[int]chan *rpc.Data),
 		},
-		Nodes: make([]*rpc.Node, 0),
+		Nodes:          make(map[int]*rpc.Node),
 		HeartBeatTable: make(map[int]bool),
 	}
-	locksmithServer.LockSmithNode.RpcMap[0] = receivingChannel	// Add Locksmith receiving channel to RpcMap
+	locksmithServer.LockSmithNode.RpcMap[0] = receivingChannel // Add Locksmith receiving channel to RpcMap
 	return locksmithServer
 }
 
 // InitializeNodes initializes the number n nodes that Locksmith is going to create
 func (locksmith *LockSmith) InitializeNodes(n int) {
-	for i := 1; i <= n; i ++ {
+	for i := 1; i <= n; i++ {
 		nodeRecvChan := make(chan *rpc.Data, 1)
 		nodeSendChan := make(chan *rpc.Data, 1)
 		isCoordinator := false
 		newNode := &rpc.Node{
 			IsCoordinator: &isCoordinator,
-			Pid: i,
-			RecvChannel: nodeRecvChan,
-			SendChannel: nodeSendChan,
+			Pid:           i,
+			RecvChannel:   nodeRecvChan,
+			SendChannel:   nodeSendChan,
 		}
 		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, i)
-		locksmith.Nodes = append(locksmith.Nodes, newNode)
+		locksmith.Nodes[i] = newNode
 		locksmith.LockSmithNode.RpcMap[i] = nodeRecvChan
 	}
-	
+
 	for _, node := range locksmith.Nodes {
 		node.Ring = locksmith.LockSmithNode.Ring
 		node.RpcMap = locksmith.LockSmithNode.RpcMap
@@ -88,12 +88,11 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 
 // StartAllNodes starts up all created nodes
 func (locksmith *LockSmith) StartAllNodes() {
-	for _, node := range locksmith.Nodes {
+	for pid, node := range locksmith.Nodes {
 		node.Start()
-		locksmith.HeartBeatTable[node.Pid] = true
+		locksmith.HeartBeatTable[pid] = true
 	}
 }
-
 
 // CheckHeartbeat periodically check if node is alive
 func (locksmith *LockSmith) CheckHeartbeat() {
@@ -110,7 +109,7 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 					locksmith.HeartBeatTable[pid] = false
 					locksmith.LockSmithNode.SendSignal(pid, &rpc.Data{
 						From: locksmith.LockSmithNode.Pid,
-						To: pid,
+						To:   pid,
 						Payload: map[string]interface{}{
 							"type": "CHECK_HEARTBEAT",
 							"data": nil,
@@ -122,15 +121,15 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.HeartBeatTable[pid] {
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
-							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout))	// allow sufficient time for node to restart, then resume heartbeat checking
+							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout)) // allow sufficient time for node to restart, then resume heartbeat checking
 						}
 					}
-					}(pid)
-				}
+				}(pid)
 			}
 		}
 	}
-	
+}
+
 // TearDown terminates node, closes all channels
 func (locksmith *LockSmith) TearDown() {
 	close(locksmith.LockSmithNode.RecvChannel)

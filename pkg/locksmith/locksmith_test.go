@@ -22,10 +22,10 @@ func TestInitializeLocksmith(t *testing.T) {
 func TestInitializeNodes(t *testing.T) {
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			Ring: make([]int, 0),
+			Ring:   make([]int, 0),
 			RpcMap: make(map[int]chan *rpc.Data),
 		},
-		Nodes: make([]*rpc.Node, 0),
+		Nodes: make(map[int]*rpc.Node),
 	}
 	locksmith.InitializeNodes(3)
 	if len(locksmith.Nodes) < 3 || len(locksmith.LockSmithNode.Ring) < 3 || len(locksmith.LockSmithNode.RpcMap) < 3 {
@@ -61,12 +61,13 @@ func TestHandleMessageReceived(t *testing.T) {
 // Expected 3 nodes to spin up and heartbeat table all update to true
 func TestStartAllNodes(t *testing.T) {
 	locksmith := &LockSmith{}
+	locksmith.Nodes = make(map[int]*rpc.Node)
 	locksmith.HeartBeatTable = make(map[int]bool)
-	for i := 1; i <= 3; i ++ {
+	for i := 1; i <= 3; i++ {
 		newNode := &rpc.Node{
 			Pid: i,
 		}
-		locksmith.Nodes = append(locksmith.Nodes, newNode)
+		locksmith.Nodes[i] = newNode
 	}
 	locksmith.StartAllNodes()
 	for pid, alive := range locksmith.HeartBeatTable {
