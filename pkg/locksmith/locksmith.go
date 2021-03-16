@@ -6,12 +6,14 @@ import (
 
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/rpc"
+	"github.com/xmliszt/e-safe/util"
 )
 
 type LockSmith struct {
-	LockSmithNode  *rpc.Node         `validate:"required"`
+	LockSmithNode *rpc.Node `validate:"required"`
 	Nodes          map[int]*rpc.Node `validate:"required"`
-	HeartBeatTable map[int]bool      `validate:"required"`
+	HeartBeatTable map[int]bool `validate:"required"`
+	Coordinator int
 }
 
 // Start is the main function that starts the entire program
@@ -116,18 +118,86 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						},
 					})
 					time.Sleep(time.Second * 1)
-					fmt.Println("Hearbeat Table: ", locksmith.HeartBeatTable)
+					fmt.Println("Heartbeat Table: ", locksmith.HeartBeatTable)
 					if !locksmith.HeartBeatTable[pid] {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.HeartBeatTable[pid] {
+							// Teardown the particular node in the Nodes
+							delete(locksmith.Nodes, pid)
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
-							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout)) // allow sufficient time for node to restart, then resume heartbeat checking
+
+							// Election process
+							locksmith.Election()
+
+							// Check and Restart all dead nodes
+							locksmith.DeadNodeChecker()
+
+							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout))	// allow sufficient time for node to restart, then resume heartbeat checking
 						}
 					}
 				}(pid)
 			}
 		}
 	}
+}
+
+func (locksmith *LockSmith) DeadNodeChecker() {
+	for k, v := range locksmith.HeartBeatTable {
+		if !v {
+			locksmith.SpawnNewNode(k)
+			fmt.Printf("Node [%d] has been revived!\n", k)
+		}
+	}
+}
+
+// Elect the highest surviving Pid node to be coordinator
+func (locksmith *LockSmith) Election() {
+	var potentialCandidate []int
+
+	for k, v := range locksmith.HeartBeatTable {
+		if v {
+			potentialCandidate = append(potentialCandidate, k)
+		}
+	}
+
+	coordinator := util.FindMax(potentialCandidate)
+	locksmith.Coordinator = coordinator
+
+	isCoordinator := true
+	locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
+
+	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
+}
+// Spawn new nodes when a node is down
+func (locksmith *LockSmith) SpawnNewNode(n int) {
+	nodeRecvChan := make(chan *rpc.Data, 1)
+	nodeSendChan := make(chan *rpc.Data, 1)
+	isCoordinator := false
+	newNode := &rpc.Node{
+		IsCoordinator: &isCoordinator,
+		Pid:           n,
+		RecvChannel:   nodeRecvChan,
+		SendChannel:   nodeSendChan,
+	}
+	
+	locksmith.Nodes[n] = newNode
+	locksmith.LockSmithNode.RpcMap[n] = nodeRecvChan
+
+	locksmith.Nodes[n].Start()
+	locksmith.HeartBeatTable[n] = true
+
+	// Update ring
+	found := util.IntInSlice(locksmith.LockSmithNode.Ring, n)
+	if !found {
+		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, n)
+	}
+	
+	// Update node
+	for _, node := range locksmith.Nodes {
+		node.Ring = locksmith.LockSmithNode.Ring
+		node.RpcMap = locksmith.LockSmithNode.RpcMap
+	}
+
 }
 
 // TearDown terminates node, closes all channels
@@ -138,8 +208,8 @@ func (locksmith *LockSmith) TearDown() {
 }
 
 // EndAllNodes starts teardown process of all created nodes
-func (locksmit *LockSmith) EndAllNodes() {
-	for _, node := range locksmit.Nodes {
+func (locksmith *LockSmith) EndAllNodes() {
+	for _, node := range locksmith.Nodes {
 		node.TearDown()
 	}
 }
