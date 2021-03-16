@@ -186,17 +186,18 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 	locksmith.Nodes[n].Start()
 	locksmith.HeartBeatTable[n] = true
 
+	// Update ring
+	found := util.IntInSlice(locksmith.LockSmithNode.Ring, n)
+	if !found {
+		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, n)
+	}
+	
 	// Update node
 	for _, node := range locksmith.Nodes {
 		node.Ring = locksmith.LockSmithNode.Ring
 		node.RpcMap = locksmith.LockSmithNode.RpcMap
 	}
 
-	// Update ring
-	found := util.IntInSlice(locksmith.LockSmithNode.Ring, n)
-	if !found {
-		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, n)
-	}
 }
 
 // TearDown terminates node, closes all channels
