@@ -191,6 +191,12 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 		node.Ring = locksmith.LockSmithNode.Ring
 		node.RpcMap = locksmith.LockSmithNode.RpcMap
 	}
+
+	// Update ring
+	found := util.IntInSlice(locksmith.LockSmithNode.Ring, n)
+	if !found {
+		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, n)
+	}
 }
 
 // TearDown terminates node, closes all channels
