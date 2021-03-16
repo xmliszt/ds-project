@@ -76,3 +76,59 @@ func TestStartAllNodes(t *testing.T) {
 		}
 	}
 }
+
+// Expected length of Nodes to increase after spawning new node
+func TestSpawnNewNode(t *testing.T) {
+	locksmith := &LockSmith{
+		LockSmithNode: &rpc.Node{
+			Ring:   make([]int, 0),
+			RpcMap: make(map[int]chan *rpc.Data),
+		},
+		Nodes: map[int]*rpc.Node{
+			1: &rpc.Node{},
+			2: &rpc.Node{},
+			3: &rpc.Node{},
+		},
+		HeartBeatTable:map[int]bool{
+			1: true,
+			2: true,
+			3: true,
+			4: false,
+		},
+	}
+
+	initLenLocksmithNodes := len(locksmith.Nodes)
+
+	locksmith.SpawnNewNode(initLenLocksmithNodes + 1)
+	LenLocksmithNodes := len(locksmith.Nodes)
+
+	if LenLocksmithNodes == initLenLocksmithNodes {
+		t.Errorf("Expected to have %d number of nodes, but only have %d!", LenLocksmithNodes, initLenLocksmithNodes)
+	}
+}
+
+func TestElection(t *testing.T) {
+	locksmith := &LockSmith{
+		LockSmithNode: &rpc.Node{
+			Ring:   make([]int, 0),
+			RpcMap: make(map[int]chan *rpc.Data),
+		},
+		Nodes: map[int]*rpc.Node{
+			1: &rpc.Node{},
+			2: &rpc.Node{},
+			3: &rpc.Node{},
+			4: &rpc.Node{},
+		},
+		HeartBeatTable:map[int]bool{
+			1: true,
+			2: true,
+			3: true,
+			4: false,
+		},
+	}
+
+	locksmith.Election()
+	if !*locksmith.Nodes[3].IsCoordinator {
+		t.Error("Node 3 supposed to be coordinator but it is not!")
+	}
+}

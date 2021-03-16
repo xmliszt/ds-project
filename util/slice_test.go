@@ -30,3 +30,11 @@ func TestIntInSlice(t *testing.T) {
 		t.Errorf("Check if 1 and 4 in slice [1 2 3] failed, results: (1)%v (4)%v", a, b)
 	}
 }
+
+func TestFindMax(t *testing.T) {
+	testArray := []int{1,2,3,5,4}
+	max := FindMax(testArray)
+	if max != 5 {
+		t.Errorf("5 should be the max but it is : %d!", max)
+	}
+}
