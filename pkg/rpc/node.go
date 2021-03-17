@@ -20,7 +20,7 @@ type Node struct {
 func (n *Node) HandleMessageReceived() {
 	
 	// Test a dead node
-	if n.Pid == 3 {
+	if n.Pid == 5 {
 		go func() {
 			time.Sleep(time.Second * 12)
 			defer close(n.RecvChannel)
