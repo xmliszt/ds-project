@@ -7,12 +7,13 @@ import (
 
 // Node contains all the variables that are necessary to manage a node
 type Node struct {
-	IsCoordinator *bool              `validate:"required"`
-	Pid           int                `validate:"gte=0"`    // Node ID
-	Ring          []int              `validate:"required"` // Ring structure of nodes
-	RecvChannel   chan *Data         `validate:"required"` // Receiving channel
-	SendChannel   chan *Data         `validate:"required"` // Sending channel
-	RpcMap        map[int]chan *Data `validate:"required"` // Map node ID to their receiving channels
+	IsCoordinator *bool `validate:"required"`
+	Pid int `validate:"gte=0"` 											// Node ID
+	Ring []int `validate:"required"`								// Ring structure of nodes
+	RecvChannel chan *Data	`validate:"required"`			// Receiving channel
+	SendChannel chan *Data `validate:"required"`			// Sending channel
+	RpcMap map[int]chan *Data `validate:"required"`	// Map node ID to their receiving channels
+	HeartBeatTable map[int]bool // Heartbeat table
 }
 
 // green part
@@ -20,9 +21,9 @@ type Node struct {
 func (n *Node) HandleMessageReceived() {
 
 	// Test a dead node
-	if n.Pid == 3 {
+	if n.Pid == 5 {
 		go func() {
-			time.Sleep(time.Second * 50)
+			time.Sleep(time.Second * 12)
 			defer close(n.RecvChannel)
 		}()
 	}
@@ -38,6 +39,12 @@ func (n *Node) HandleMessageReceived() {
 					"data": nil,
 				},
 			})
+		case "UPDATE_HEARTBEAT":
+			heartbeatTable := msg.Payload["data"]
+			n.HeartBeatTable = heartbeatTable.(map[int]bool)
+		case "YOU_ARE_COORDINATOR":
+			isCoordinator := true
+			n.IsCoordinator = &isCoordinator
 		}
 	}
 }

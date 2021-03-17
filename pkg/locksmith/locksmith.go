@@ -94,6 +94,17 @@ func (locksmith *LockSmith) StartAllNodes() {
 		node.Start()
 		locksmith.HeartBeatTable[pid] = true
 	}
+	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
+	
+	// Send message to node to turn coordinator field to true	
+	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
+		From: locksmith.LockSmithNode.Pid,
+		To:   coordinator,
+		Payload: map[string]interface{}{
+			"type": "YOU_ARE_COORDINATOR",
+			"data": nil,
+		},
+	})
 }
 
 // CheckHeartbeat periodically check if node is alive
@@ -122,15 +133,25 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 					if !locksmith.HeartBeatTable[pid] {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.HeartBeatTable[pid] {
-							// Teardown the particular node in the Nodes
-							delete(locksmith.Nodes, pid)
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
 
 							// Election process
-							locksmith.Election()
+							if *locksmith.Nodes[pid].IsCoordinator {
+								locksmith.Election()
+							}
 
+							// Teardown the particular node in the Nodes
+							delete(locksmith.Nodes, pid)
+							
+							// Send heartbeat table to all nodes
+							locksmith.BroadcastHeartbeatTable()
+							
+							
 							// Check and Restart all dead nodes
 							locksmith.DeadNodeChecker()
+							
+							// Send heartbeat table to all nodes
+							locksmith.BroadcastHeartbeatTable()
 
 							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout))	// allow sufficient time for node to restart, then resume heartbeat checking
 						}
@@ -139,6 +160,22 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 			}
 		}
 	}
+}
+
+// Send heartbeat table to all nodes
+func (locksmith *LockSmith) BroadcastHeartbeatTable() {
+	for _, pid := range locksmith.LockSmithNode.Ring {
+		locksmith.LockSmithNode.SendSignal(pid, &rpc.Data{
+			From: locksmith.LockSmithNode.Pid,
+			To:   pid,
+			Payload: map[string]interface{}{
+				"type": "UPDATE_HEARTBEAT",
+				"data": locksmith.HeartBeatTable,
+			},
+		})
+		fmt.Printf("Node [%d] has updated its heartbeat table from locksmith\n", pid)
+	}
+
 }
 
 func (locksmith *LockSmith) DeadNodeChecker() {
@@ -163,8 +200,18 @@ func (locksmith *LockSmith) Election() {
 	coordinator := util.FindMax(potentialCandidate)
 	locksmith.Coordinator = coordinator
 
-	isCoordinator := true
-	locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
+	// Send message to node to turn coordinator field to true	
+	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
+		From: locksmith.LockSmithNode.Pid,
+		To:   coordinator,
+		Payload: map[string]interface{}{
+			"type": "YOU_ARE_COORDINATOR",
+			"data": nil,
+		},
+	})
+	
+	// isCoordinator := true
+	// locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
 
 	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }
