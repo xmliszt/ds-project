@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Node contains all the variables that are necessary to manage a node
 type Node struct {
 	IsCoordinator *bool `validate:"required"`
 	Pid int `validate:"gte=0"` 											// Node ID
@@ -18,7 +19,7 @@ type Node struct {
 // green part
 // HandleMessageReceived is a Go routine that handles the messages received
 func (n *Node) HandleMessageReceived() {
-	
+
 	// Test a dead node
 	if n.Pid == 5 {
 		go func() {
@@ -32,7 +33,7 @@ func (n *Node) HandleMessageReceived() {
 		case "CHECK_HEARTBEAT":
 			n.SendSignal(0, &Data{
 				From: n.Pid,
-				To: 0,
+				To:   0,
 				Payload: map[string]interface{}{
 					"type": "REPLY_HEARTBEAT",
 					"data": nil,
