@@ -1,6 +1,9 @@
 package rpc
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 type Secret struct {
 	// Key   int
@@ -8,6 +11,7 @@ type Secret struct {
 	Role  int    // Int to identify role (clearance level)
 }
 
+// GetSecret returns the secret that is referenced by the specific id
 func (n Node) GetSecret(id string) (interface{}, error) {
 	allData, fileError := n.ReadDataFile()
 	if fileError != nil {
@@ -22,15 +26,22 @@ func (n Node) GetSecret(id string) (interface{}, error) {
 	return nil, nil
 }
 
+// GetSecrets returns secrets available within the range given
 func (n *Node) GetSecrets(from int, to int) (interface{}, error) {
 	allData, fileError := n.ReadDataFile()
 	if fileError != nil {
 		return nil, fileError
 	} else {
-		return allData, nil
+		specifcData := make(map[string]Secret)
+		for dictKeyInt := from; dictKeyInt <= to; dictKeyInt++ {
+			stringKey := strconv.Itoa(dictKeyInt)
+			specifcData[stringKey] = allData[stringKey]
+		}
+		return specifcData, nil
 	}
 }
 
+// PutSecret place a specific secret within the respective data file
 func (n *Node) PutSecret(key string, secret Secret) error {
 	newSecret := SecretToMapSecret(secret, key)
 	fileError := n.WriteDataFile(newSecret)
