@@ -23,7 +23,7 @@ func (n *Node) ReadUsersFile() (map[string]User, error) {
 	jsonFile, osErr := os.Open("../../users.json")
 
 	if osErr != nil { // if we os.Open returns an error then handle it
-		fmt.Println(osErr)
+		// fmt.Println(osErr)
 		return nil, osErr
 		// exit program
 	}
@@ -32,14 +32,21 @@ func (n *Node) ReadUsersFile() (map[string]User, error) {
 
 	defer jsonFile.Close()
 
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	// fmt.Println(byteValue)
+	byteValue, readAllError := ioutil.ReadAll(jsonFile)
+	if readAllError != nil {
+		// fmt.Println(readAllError)
+		return nil, readAllError
+	}
 
 	var fileContents map[string]User
 
 	// Unmarshal parses the byteValue array to a type defined by fileContents
-	json.Unmarshal([]byte(byteValue), &fileContents)
-
+	marshalError := json.Unmarshal([]byte(byteValue), &fileContents)
+	if marshalError != nil { // if we os.Open returns an error then handle it
+		// fmt.Println(marshalError)
+		return nil, marshalError
+		// exit program
+	}
 	return fileContents, nil
 }
 
@@ -50,7 +57,7 @@ func (n *Node) ReadDataFile() (map[string]Secret, error) {
 	jsonFile, osErr := os.Open(filePath)
 
 	if osErr != nil {
-		fmt.Println(osErr)
+		// fmt.Println(osErr)
 		return nil, osErr
 	}
 
@@ -58,10 +65,19 @@ func (n *Node) ReadDataFile() (map[string]Secret, error) {
 
 	defer jsonFile.Close()
 
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, readAllError := ioutil.ReadAll(jsonFile)
+	if readAllError != nil {
+		// fmt.Println(readAllError)
+		return nil, readAllError
+	}
 
 	var fileContents map[string]Secret
-	json.Unmarshal([]byte(byteValue), &fileContents)
+	marshalError := json.Unmarshal([]byte(byteValue), &fileContents)
+	if marshalError != nil { // if we os.Open returns an error then handle it
+		// fmt.Println(marshalError)
+		return nil, marshalError
+		// exit program
+	}
 
 	return fileContents, nil
 }
@@ -72,7 +88,7 @@ func (n *Node) WriteUsersFile(addUsers map[string]User) error {
 	originalFileContent, readError := n.ReadUsersFile()
 
 	if readError != nil {
-		fmt.Println(readError)
+		// fmt.Println(readError)
 		return readError
 	}
 	fmt.Println("Original:\n", originalFileContent)
@@ -86,14 +102,14 @@ func (n *Node) WriteUsersFile(addUsers map[string]User) error {
 
 	file, marshallError := json.MarshalIndent(originalFileContent, "", " ")
 	if marshallError != nil {
-		fmt.Println(marshallError)
+		// fmt.Println(marshallError)
 		return marshallError
 
 	}
 
 	var writeError = ioutil.WriteFile("../../users.json", file, 0644)
 	if writeError != nil {
-		fmt.Println(writeError)
+		// fmt.Println(writeError)
 		return writeError
 	}
 	// fmt.Println(n.ReadUsersFile())
@@ -107,7 +123,7 @@ func (n *Node) WriteDataFile(addData map[string]Secret) error {
 	originalFileContent, readError := n.ReadDataFile()
 
 	if readError != nil {
-		fmt.Println(readError)
+		// fmt.Println(readError)
 		return readError
 	}
 	fmt.Println("Original:\n", originalFileContent)

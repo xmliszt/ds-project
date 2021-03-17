@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"fmt"
 	"strconv"
 )
 
@@ -64,11 +63,11 @@ func (n *Node) DeleteSecret(key string) error {
 		return fileError
 	} else {
 		delete(allData, key)
-		fmt.Println("HERE:\n\n", allData, "\n\n")
-		// for key, value := range allData {
-		// 	n.PutSecret(key, value)
-		// }
-		n.OverwriteDataFile(allData)
+		overwriteError := n.OverwriteDataFile(allData)
+		if overwriteError != nil {
+			// fmt.Println(overwriteError)
+			return overwriteError
+		}
 		return nil
 
 	}
