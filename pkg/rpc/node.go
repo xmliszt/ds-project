@@ -41,6 +41,9 @@ func (n *Node) HandleMessageReceived() {
 		case "UPDATE_HEARTBEAT":
 			heartbeatTable := msg.Payload["data"]
 			n.HeartBeatTable = heartbeatTable.(map[int]bool)
+		case "YOU_ARE_COORDINATOR":
+			isCoordinator := true
+			n.IsCoordinator = &isCoordinator
 		}
 	}
 }
