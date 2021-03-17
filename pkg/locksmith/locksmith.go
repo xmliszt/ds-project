@@ -10,10 +10,10 @@ import (
 )
 
 type LockSmith struct {
-	LockSmithNode *rpc.Node `validate:"required"`
+	LockSmithNode  *rpc.Node         `validate:"required"`
 	Nodes          map[int]*rpc.Node `validate:"required"`
-	HeartBeatTable map[int]bool `validate:"required"`
-	Coordinator int
+	HeartBeatTable map[int]bool      `validate:"required"`
+	Coordinator    int
 }
 
 // Start is the main function that starts the entire program
@@ -95,8 +95,8 @@ func (locksmith *LockSmith) StartAllNodes() {
 		locksmith.HeartBeatTable[pid] = true
 	}
 	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
-	
-	// Send message to node to turn coordinator field to true	
+
+	// Send message to node to turn coordinator field to true
 	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
 		From: locksmith.LockSmithNode.Pid,
 		To:   coordinator,
@@ -105,6 +105,7 @@ func (locksmith *LockSmith) StartAllNodes() {
 			"data": nil,
 		},
 	})
+
 }
 
 // CheckHeartbeat periodically check if node is alive
@@ -142,18 +143,17 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 
 							// Teardown the particular node in the Nodes
 							delete(locksmith.Nodes, pid)
-							
-							// Send heartbeat table to all nodes
-							locksmith.BroadcastHeartbeatTable()
-							
-							
-							// Check and Restart all dead nodes
-							locksmith.DeadNodeChecker()
-							
+
 							// Send heartbeat table to all nodes
 							locksmith.BroadcastHeartbeatTable()
 
-							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout))	// allow sufficient time for node to restart, then resume heartbeat checking
+							// Check and Restart all dead nodes
+							locksmith.DeadNodeChecker()
+
+							// Send heartbeat table to all nodes
+							locksmith.BroadcastHeartbeatTable()
+
+							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout)) // allow sufficient time for node to restart, then resume heartbeat checking
 						}
 					}
 				}(pid)
@@ -200,7 +200,7 @@ func (locksmith *LockSmith) Election() {
 	coordinator := util.FindMax(potentialCandidate)
 	locksmith.Coordinator = coordinator
 
-	// Send message to node to turn coordinator field to true	
+	// Send message to node to turn coordinator field to true
 	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
 		From: locksmith.LockSmithNode.Pid,
 		To:   coordinator,
@@ -209,12 +209,13 @@ func (locksmith *LockSmith) Election() {
 			"data": nil,
 		},
 	})
-	
+
 	// isCoordinator := true
 	// locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
 
 	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }
+
 // Spawn new nodes when a node is down
 func (locksmith *LockSmith) SpawnNewNode(n int) {
 	nodeRecvChan := make(chan *rpc.Data, 1)
@@ -226,7 +227,7 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 		RecvChannel:   nodeRecvChan,
 		SendChannel:   nodeSendChan,
 	}
-	
+
 	locksmith.Nodes[n] = newNode
 	locksmith.LockSmithNode.RpcMap[n] = nodeRecvChan
 
@@ -238,7 +239,7 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 	if !found {
 		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, n)
 	}
-	
+
 	// Update node
 	for _, node := range locksmith.Nodes {
 		node.Ring = locksmith.LockSmithNode.Ring

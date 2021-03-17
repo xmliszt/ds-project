@@ -7,13 +7,13 @@ import (
 
 // Node contains all the variables that are necessary to manage a node
 type Node struct {
-	IsCoordinator *bool `validate:"required"`
-	Pid int `validate:"gte=0"` 											// Node ID
-	Ring []int `validate:"required"`								// Ring structure of nodes
-	RecvChannel chan *Data	`validate:"required"`			// Receiving channel
-	SendChannel chan *Data `validate:"required"`			// Sending channel
-	RpcMap map[int]chan *Data `validate:"required"`	// Map node ID to their receiving channels
-	HeartBeatTable map[int]bool // Heartbeat table
+	IsCoordinator  *bool              `validate:"required"`
+	Pid            int                `validate:"gte=0"`    // Node ID
+	Ring           []int              `validate:"required"` // Ring structure of nodes
+	RecvChannel    chan *Data         `validate:"required"` // Receiving channel
+	SendChannel    chan *Data         `validate:"required"` // Sending channel
+	RpcMap         map[int]chan *Data `validate:"required"` // Map node ID to their receiving channels
+	HeartBeatTable map[int]bool       // Heartbeat table
 }
 
 // green part

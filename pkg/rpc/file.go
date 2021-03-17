@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -20,12 +21,16 @@ type FileMethods interface {
 // Code adapted from: https://tutorialedge.net/golang/parsing-json-with-golang/
 func (n *Node) ReadUsersFile() (map[string]User, error) {
 
-	jsonFile, osErr := os.Open("../../users.json")
+	cwd, err := os.Getwd()
+	fmt.Println(cwd)
+	if err != nil {
+		return nil, err
+	}
+	userFilePath := filepath.Join(cwd, "users.json")
+	jsonFile, osErr := os.Open(userFilePath)
 
 	if osErr != nil { // if we os.Open returns an error then handle it
-		// fmt.Println(osErr)
 		return nil, osErr
-		// exit program
 	}
 
 	fmt.Println("Successfully Opened users.json")
@@ -53,7 +58,10 @@ func (n *Node) ReadUsersFile() (map[string]User, error) {
 // ReadDataFile returns all the information from the data.json of the respective node's local file
 func (n *Node) ReadDataFile() (map[string]Secret, error) {
 
-	filePath := dataFilePathNode(n.Pid)
+	filePath, err := dataFilePathNode(n.Pid)
+	if err != nil {
+		return nil, err
+	}
 	jsonFile, osErr := os.Open(filePath)
 
 	if osErr != nil {
@@ -119,7 +127,10 @@ func (n *Node) WriteUsersFile(addUsers map[string]User) error {
 // WriteDataFile taks in the variable with map type then update the user file
 func (n *Node) WriteDataFile(addData map[string]Secret) error {
 
-	filePath := dataFilePathNode(n.Pid)
+	filePath, err := dataFilePathNode(n.Pid)
+	if err != nil {
+		return err
+	}
 	originalFileContent, readError := n.ReadDataFile()
 
 	if readError != nil {
@@ -149,16 +160,24 @@ func (n *Node) WriteDataFile(addData map[string]Secret) error {
 	return nil
 }
 
-func dataFilePathNode(nodePID int) string {
+func dataFilePathNode(nodePID int) (string, error) {
 	id := strconv.Itoa(nodePID)
-	dataFilePath := "../../nodeStorage/node" + id + "/data.json"
-	return dataFilePath
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dataFilePath := filepath.Join(cwd, "nodeStorage/node"+id+"/data.json")
+	return dataFilePath, nil
 }
 
 // OverwriteDatafromFile taks in the variable with map type then update the user file
 func (n *Node) OverwriteDataFile(addData map[string]Secret) error {
 
-	filePath := dataFilePathNode(n.Pid)
+	filePath, err := dataFilePathNode(n.Pid)
+
+	if err != nil {
+		return err
+	}
 
 	file, marshallError := json.MarshalIndent(addData, "", " ")
 	if marshallError != nil {
