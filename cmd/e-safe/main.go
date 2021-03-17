@@ -1,6 +1,7 @@
 package main
 
 import (
+<<<<<<< HEAD
 	"github.com/xmliszt/e-safe/pkg/rpc"
 )
 
@@ -40,3 +41,18 @@ func main() {
 	// myNode.ReadDataFile()
 	// rpc.ReadJSONOri("user2.json")
 }
+=======
+	"fmt"
+	"os"
+
+	"github.com/xmliszt/e-safe/pkg/locksmith"
+)
+
+func main() {
+	err := locksmith.Start()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+>>>>>>> dev

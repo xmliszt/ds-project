@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -11,15 +13,26 @@ var expectedConfig = &Config{
 	},
 	ConfigNode: ConfigNode{
 		Number: 5,
+		HeartbeatInterval: 5,
+	},
+	ConfigTimeout: ConfigTimeout{
+		HeartBeatTimeout: 15,
+		NodeCreationTimeout: 60,
 	},
 }
 
 func TestLoadConfig(t *testing.T) {
-	config, err := LoadConfig()
+	cwd, err := os.Getwd()
 	if err != nil {
 		t.Error(err)
 	}
-	if !config.IsEqual(expectedConfig) {
+	rootPath, _ := filepath.Split(cwd)
+	configPath := filepath.Join(rootPath, "config.yaml")
+	config, err := LoadConfig(configPath)
+	if err != nil {
+		t.Errorf("Error opening config! ERROR: %v | Config File Path: %s", err, configPath)
+	}
+	if !(config.ConfigServer == expectedConfig.ConfigServer && config.ConfigNode == expectedConfig.ConfigNode) {
 		t.Errorf("Expected: %v, instead received: %v", expectedConfig, config)
 	}
 }
