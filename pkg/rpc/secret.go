@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"errors"
 	"strconv"
 )
 
@@ -21,8 +22,10 @@ func (n Node) GetSecret(id string) (interface{}, error) {
 				return allData[key], nil
 			}
 		}
+		unknownSecretIDError := errors.New("use	rname not available")
+		return nil, unknownSecretIDError
 	}
-	return nil, nil
+
 }
 
 // GetSecrets returns secrets available within the range given

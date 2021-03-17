@@ -1,5 +1,7 @@
 package rpc
 
+import "errors"
+
 // User contains all the variables that are found in User database
 type User struct {
 	Username string // Username as string
@@ -16,25 +18,19 @@ type UserMethods interface {
 
 // GetUser obtains a specific user based on their username provided
 func (n *Node) GetUser(username string) (interface{}, error) {
-	// allUsers := make(map[string]User)
-	// var var1 interface{}
-	// var var2 error
 	allUsers, fileError := n.ReadUsersFile()
-	// fmt.Println(allUsers, fileError)
 	if fileError != nil {
 		return nil, fileError
 	} else {
 		for key := range allUsers {
-			//fmt.Println(allUsers[key].Username)
 			if allUsers[key].Username == username {
-				// var1, var2 = allUsers[key], nil
 				return allUsers[key], nil
 			}
+
 		}
+		unknownUsernameError := errors.New("use	rname not available")
+		return nil, unknownUsernameError
 	}
-	// map[string]User allUsers := n.ReadUsersFile();
-	// return User{"User", "Pass", 2}
-	return nil, nil
 }
 
 // CreateUser creates a user based on the User structure provided
