@@ -1,9 +1,5 @@
 package rpc
 
-import (
-	"fmt"
-)
-
 // User contains all the variables that are found in User database
 type User struct {
 	Username string // Username as string
@@ -19,50 +15,49 @@ type UserMethods interface {
 }
 
 // GetUser obtains a specific user based on their username provided
-func (n *Node) GetUser(username string) User {
-	return User{"User", "Pass", 2}
+func (n *Node) GetUser(username string) (interface{}, error) {
+	// allUsers := make(map[string]User)
+	allUsers, fileError := n.ReadUsersFile()
+	if fileError != nil {
+		return nil, fileError
+	} else {
+		// may have error since there is a variable declared but not used
+		for key, value := range allUsers {
+			if value.Username == username {
+				return value, nil
+			}
+		}
+	}
+	// map[string]User allUsers := n.ReadUsersFile();
+	// return User{"User", "Pass", 2}
+	return nil, nil
 }
 
 // CreateUser creates a user based on the User structure provided
-func (n *Node) CreateUser(user User) {
-	fmt.Println("Hellu")
+func (n *Node) CreateUser(user User, userID string) error {
+	newUser := UserToMapUser(user, userID)
+	fileError := n.WriteUsersFile(newUser)
+	if fileError != nil {
+		return fileError
+	} else {
+		return nil
+	}
 }
 
-// SimpleMethod for testing
-func SimpleMethod() {
-	fmt.Println("Simple Method")
+func UserToMapUser(user User, userID string) map[string]User {
+	newUser := make(map[string]User)
+	newUser[userID] = user
+	return newUser
 }
 
 // GetUsers gets all  users
-func (n *Node) GetUsers() []User {
+func (n *Node) GetUsers() (map[string]User, error) {
 	// user1 = User{"user1", "password1", 1}
 	// user2 = User{"user2", "password2", 1}
-	var userList = []User{User{"user2", "password2", 1}, User{"user2", "password2", 1}}
-	return userList
+	allUsers, fileError := n.ReadUsersFile()
+	if fileError != nil {
+		return nil, fileError
+	} else {
+		return allUsers, nil
+	}
 }
-
-// func ReadJSONOri(fileName string) {
-
-// 	// Code adapted from: https://tutorialedge.net/golang/parsing-json-with-golang/
-// 	jsonFile, err := os.Open("users.json")
-// 	// if we os.Open returns an error then handle it
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// 	fmt.Println("Successfully Opened users.json")
-// 	// defer the closing of our jsonFile so that we can parse it later on
-// 	defer jsonFile.Close()
-
-// 	byteValue, _ := ioutil.ReadAll(jsonFile)
-// 	// fmt.Println(byteValue)
-
-// 	var result map[string][]User
-// 	json.Unmarshal([]byte(byteValue), &result)
-
-// 	fmt.Println(result)
-// 	// Get User object from slice stored in map.
-// 	// From User object retrieve Username attribute.
-// 	fmt.Println(result["users"][0].Username)
-// 	// fmt.Println(reflect.ValueOf(result["users"][0]).Kind())
-
-// }
