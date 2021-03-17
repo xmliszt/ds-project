@@ -120,6 +120,7 @@ func TestSpawnNewNode(t *testing.T) {
 
 func TestElection(t *testing.T) {
 	mockChan := make(chan *rpc.Data)
+	iscoordinator := false
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
 			Ring: make([]int, 0),
@@ -131,7 +132,8 @@ func TestElection(t *testing.T) {
 			1: &rpc.Node{},
 			2: &rpc.Node{},
 			3: &rpc.Node{
-				RecvChannel: mockChan,
+				RecvChannel:   mockChan,
+				IsCoordinator: &iscoordinator,
 			},
 			4: &rpc.Node{},
 		},
