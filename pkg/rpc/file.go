@@ -166,7 +166,7 @@ func dataFilePathNode(nodePID int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dataFilePath := filepath.Join(cwd, "nodeStorage/node"+id+"/data.json")
+	dataFilePath := filepath.Join(cwd, "nodeStorage", "node"+id, "data.json")
 	return dataFilePath, nil
 }
 
