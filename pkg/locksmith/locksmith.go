@@ -163,8 +163,18 @@ func (locksmith *LockSmith) Election() {
 	coordinator := util.FindMax(potentialCandidate)
 	locksmith.Coordinator = coordinator
 
-	isCoordinator := true
-	locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
+	// Send message to node to turn coordinator field to true	
+	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
+		From: locksmith.LockSmithNode.Pid,
+		To:   coordinator,
+		Payload: map[string]interface{}{
+			"type": "YOU_ARE_COORDINATOR",
+			"data": nil,
+		},
+	})
+	
+	// isCoordinator := true
+	// locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
 
 	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }

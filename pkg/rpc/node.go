@@ -21,7 +21,7 @@ func (n *Node) HandleMessageReceived() {
 	// Test a dead node
 	if n.Pid == 3 {
 		go func() {
-			time.Sleep(time.Second * 50)
+			time.Sleep(time.Second * 12)
 			defer close(n.RecvChannel)
 		}()
 	}
@@ -37,6 +37,9 @@ func (n *Node) HandleMessageReceived() {
 					"data": nil,
 				},
 			})
+		case "YOU_ARE_COORDINATOR":
+			isCoordinator := true
+			n.IsCoordinator = &isCoordinator
 		}
 	}
 }
