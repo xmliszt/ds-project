@@ -95,7 +95,6 @@ func (locksmith *LockSmith) StartAllNodes() {
 		locksmith.HeartBeatTable[pid] = true
 	}
 	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
-
 	// Send message to node to turn coordinator field to true
 	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
 		From: locksmith.LockSmithNode.Pid,
@@ -105,7 +104,6 @@ func (locksmith *LockSmith) StartAllNodes() {
 			"data": nil,
 		},
 	})
-
 }
 
 // CheckHeartbeat periodically check if node is alive

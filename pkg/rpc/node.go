@@ -16,7 +16,6 @@ type Node struct {
 	HeartBeatTable map[int]bool       // Heartbeat table
 }
 
-// green part
 // HandleMessageReceived is a Go routine that handles the messages received
 func (n *Node) HandleMessageReceived() {
 
