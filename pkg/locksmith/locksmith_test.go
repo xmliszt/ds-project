@@ -146,6 +146,7 @@ func TestElection(t *testing.T) {
 	}
 	locksmith.Nodes[3].Start()
 	locksmith.Election()
+	time.Sleep(time.Second * 2)
 	if !*locksmith.Nodes[3].IsCoordinator {
 		t.Error("Node 3 supposed to be coordinator but it is not!")
 	}
