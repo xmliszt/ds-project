@@ -125,12 +125,18 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 							// Teardown the particular node in the Nodes
 							delete(locksmith.Nodes, pid)
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
-
+							
+							// Send heartbeat table to all nodes
+							locksmith.BroadcastHeartbeatTable()
+							
 							// Election process
 							locksmith.Election()
-
+							
 							// Check and Restart all dead nodes
 							locksmith.DeadNodeChecker()
+							
+							// Send heartbeat table to all nodes
+							locksmith.BroadcastHeartbeatTable()
 
 							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout))	// allow sufficient time for node to restart, then resume heartbeat checking
 						}
@@ -139,6 +145,23 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 			}
 		}
 	}
+}
+
+// Send heartbeat table to all nodes
+func (locksmith *LockSmith) BroadcastHeartbeatTable() {
+	for _, pid := range locksmith.LockSmithNode.Ring {
+		locksmith.LockSmithNode.SendSignal(pid, &rpc.Data{
+			From: locksmith.LockSmithNode.Pid,
+			To:   pid,
+			Payload: map[string]interface{}{
+				"type": "UPDATE_HEARTBEAT",
+				"data": locksmith.HeartBeatTable,
+			},
+		})
+		fmt.Printf("Node [%d] has updated its heartbeat table from locksmith\n", pid)
+		fmt.Println("Heartbeat table looks like", locksmith.HeartBeatTable)
+	}
+
 }
 
 func (locksmith *LockSmith) DeadNodeChecker() {
