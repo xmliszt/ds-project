@@ -120,16 +120,16 @@ func (n *Node) WriteDataFile(addData map[string]Secret) error {
 
 	file, marshallError := json.MarshalIndent(originalFileContent, "", " ")
 	if marshallError != nil {
-		fmt.Println(marshallError)
+		// fmt.Println(marshallError)
 		return marshallError
 	}
 
 	var writeError = ioutil.WriteFile(filePath, file, 0644)
 	if writeError != nil {
-		fmt.Println(writeError)
+		// fmt.Println(writeError)
 		return writeError
 	}
-	fmt.Println(n.ReadDataFile())
+	// fmt.Println(n.ReadDataFile())
 	return nil
 }
 
@@ -137,4 +137,24 @@ func dataFilePathNode(nodePID int) string {
 	id := strconv.Itoa(nodePID)
 	dataFilePath := "../../nodeStorage/node" + id + "/data.json"
 	return dataFilePath
+}
+
+// OverwriteDatafromFile taks in the variable with map type then update the user file
+func (n *Node) OverwriteDataFile(addData map[string]Secret) error {
+
+	filePath := dataFilePathNode(n.Pid)
+
+	file, marshallError := json.MarshalIndent(addData, "", " ")
+	if marshallError != nil {
+		// fmt.Println(marshallError)
+		return marshallError
+	}
+
+	var writeError = ioutil.WriteFile(filePath, file, 0644)
+	if writeError != nil {
+		// fmt.Println(writeError)
+		return writeError
+	}
+	// fmt.Println(n.ReadDataFile())
+	return nil
 }

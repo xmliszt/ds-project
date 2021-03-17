@@ -17,14 +17,18 @@ type UserMethods interface {
 // GetUser obtains a specific user based on their username provided
 func (n *Node) GetUser(username string) (interface{}, error) {
 	// allUsers := make(map[string]User)
+	// var var1 interface{}
+	// var var2 error
 	allUsers, fileError := n.ReadUsersFile()
+	// fmt.Println(allUsers, fileError)
 	if fileError != nil {
 		return nil, fileError
 	} else {
-		// may have error since there is a variable declared but not used
-		for key, value := range allUsers {
-			if value.Username == username {
-				return value, nil
+		for key := range allUsers {
+			//fmt.Println(allUsers[key].Username)
+			if allUsers[key].Username == username {
+				// var1, var2 = allUsers[key], nil
+				return allUsers[key], nil
 			}
 		}
 	}
@@ -38,9 +42,9 @@ func (n *Node) CreateUser(user User, userID string) error {
 	newUser := UserToMapUser(user, userID)
 	fileError := n.WriteUsersFile(newUser)
 	if fileError != nil {
-		return fileError
-	} else {
 		return nil
+	} else {
+		return fileError
 	}
 }
 
@@ -52,8 +56,6 @@ func UserToMapUser(user User, userID string) map[string]User {
 
 // GetUsers gets all  users
 func (n *Node) GetUsers() (map[string]User, error) {
-	// user1 = User{"user1", "password1", 1}
-	// user2 = User{"user2", "password2", 1}
 	allUsers, fileError := n.ReadUsersFile()
 	if fileError != nil {
 		return nil, fileError
