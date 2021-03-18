@@ -2,8 +2,12 @@ package rpc
 
 import (
 	"fmt"
-	"time"
+	"log"
+	"net/http"
 
+	"github.com/gorilla/mux"
+	"github.com/xmliszt/e-safe/config"
+	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/data"
 )
 
@@ -20,14 +24,6 @@ type Node struct {
 
 // HandleMessageReceived is a Go routine that handles the messages received
 func (n *Node) HandleMessageReceived() {
-
-	// Test a dead node
-	if n.Pid == 5 {
-		go func() {
-			time.Sleep(time.Second * 12)
-			defer close(n.RecvChannel)
-		}()
-	}
 
 	for msg := range n.RecvChannel {
 		switch msg.Payload["type"] {
@@ -46,6 +42,7 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
+			go n.HandleAPIRequests()
 		}
 	}
 }
@@ -61,4 +58,25 @@ func (n *Node) TearDown() {
 	close(n.RecvChannel)
 	close(n.SendChannel)
 	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
+}
+
+// API Requests Handlers
+func (n *Node) HandleAPIRequests() {
+	log.Printf("Node %d listening to client's requests...\n", n.Pid)
+	config, err := config.GetConfig()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	router := mux.NewRouter().StrictSlash(true)
+
+	// General
+	router.HandleFunc("/", api.Home).Methods("GET")
+
+	// User
+	router.HandleFunc("/user", api.CreateUser).Methods("POST")
+
+	// Secret
+	router.HandleFunc("/secret", api.GetSecret).Methods("GET")
+	router.HandleFunc("/secret", api.PutSecret).Methods("POST")
+	log.Fatal(http.ListenAndServe(":"+fmt.Sprintf("%d", config.ConfigServer.Port), router))
 }

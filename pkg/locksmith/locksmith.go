@@ -129,7 +129,6 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						},
 					})
 					time.Sleep(time.Second * 1)
-					fmt.Println("Heartbeat Table: ", locksmith.HeartBeatTable)
 					if !locksmith.HeartBeatTable[pid] {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.HeartBeatTable[pid] {
@@ -172,9 +171,7 @@ func (locksmith *LockSmith) BroadcastHeartbeatTable() {
 				"data": locksmith.HeartBeatTable,
 			},
 		})
-		fmt.Printf("Node [%d] has updated its heartbeat table from locksmith\n", pid)
 	}
-
 }
 
 func (locksmith *LockSmith) DeadNodeChecker() {
@@ -208,9 +205,6 @@ func (locksmith *LockSmith) Election() {
 			"data": nil,
 		},
 	})
-
-	// isCoordinator := true
-	// locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
 
 	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }

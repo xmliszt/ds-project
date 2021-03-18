@@ -1,30 +1,22 @@
 {
- "1006969": {
-  "Value": "mySectret",
-  "Role": 100
- },
- "1007070": {
-  "Value": "yourSecret",
-  "Role": 1
- },
  "126": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
+  "Role": 3,
+  "Value": "hashed_Vict0r1aSecret3"
  },
  "127": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
+  "Role": 3,
+  "Value": "hashed_Vict0r1aSecret3"
  },
  "128": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
+  "Role": 3,
+  "Value": "hashed_Vict0r1aSecret3"
  },
  "129": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
+  "Role": 3,
+  "Value": "hashed_Vict0r1aSecret3"
  },
  "130": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
+  "Role": 3,
+  "Value": "hashed_Vict0r1aSecret3"
  }
 }
