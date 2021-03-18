@@ -56,4 +56,4 @@ jobs:
 
       - name: Build
         run: |
-          go build cmd/e-safe/main.go
+          go build
