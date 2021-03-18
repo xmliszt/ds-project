@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/data"
 )
 
@@ -47,7 +46,6 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
-			go api.HandleAPIRequests()
 		}
 	}
 }
