@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/xmliszt/e-safe/config"
+	"github.com/xmliszt/e-safe/pkg/data"
 	"github.com/xmliszt/e-safe/pkg/rpc"
 	"github.com/xmliszt/e-safe/util"
 )
@@ -36,8 +37,8 @@ func Start() error {
 
 // InitializeLocksmith initializes the locksmith server object
 func InitializeLocksmith() *LockSmith {
-	receivingChannel := make(chan *rpc.Data, 1)
-	sendingChannel := make(chan *rpc.Data, 1)
+	receivingChannel := make(chan *data.Data, 1)
+	sendingChannel := make(chan *data.Data, 1)
 	isCoordinator := false
 	locksmithServer := &LockSmith{
 		LockSmithNode: &rpc.Node{
@@ -46,7 +47,7 @@ func InitializeLocksmith() *LockSmith {
 			RecvChannel:   receivingChannel,
 			SendChannel:   sendingChannel,
 			Ring:          make([]int, 0),
-			RpcMap:        make(map[int]chan *rpc.Data),
+			RpcMap:        make(map[int]chan *data.Data),
 		},
 		Nodes:          make(map[int]*rpc.Node),
 		HeartBeatTable: make(map[int]bool),
@@ -58,8 +59,8 @@ func InitializeLocksmith() *LockSmith {
 // InitializeNodes initializes the number n nodes that Locksmith is going to create
 func (locksmith *LockSmith) InitializeNodes(n int) {
 	for i := 1; i <= n; i++ {
-		nodeRecvChan := make(chan *rpc.Data, 1)
-		nodeSendChan := make(chan *rpc.Data, 1)
+		nodeRecvChan := make(chan *data.Data, 1)
+		nodeSendChan := make(chan *data.Data, 1)
 		isCoordinator := false
 		newNode := &rpc.Node{
 			IsCoordinator: &isCoordinator,
@@ -96,7 +97,7 @@ func (locksmith *LockSmith) StartAllNodes() {
 	}
 	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
 	// Send message to node to turn coordinator field to true
-	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
+	locksmith.LockSmithNode.SendSignal(coordinator, &data.Data{
 		From: locksmith.LockSmithNode.Pid,
 		To:   coordinator,
 		Payload: map[string]interface{}{
@@ -119,7 +120,7 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 			if locksmith.HeartBeatTable[pid] {
 				go func(pid int) {
 					locksmith.HeartBeatTable[pid] = false
-					locksmith.LockSmithNode.SendSignal(pid, &rpc.Data{
+					locksmith.LockSmithNode.SendSignal(pid, &data.Data{
 						From: locksmith.LockSmithNode.Pid,
 						To:   pid,
 						Payload: map[string]interface{}{
@@ -163,7 +164,7 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 // Send heartbeat table to all nodes
 func (locksmith *LockSmith) BroadcastHeartbeatTable() {
 	for _, pid := range locksmith.LockSmithNode.Ring {
-		locksmith.LockSmithNode.SendSignal(pid, &rpc.Data{
+		locksmith.LockSmithNode.SendSignal(pid, &data.Data{
 			From: locksmith.LockSmithNode.Pid,
 			To:   pid,
 			Payload: map[string]interface{}{
@@ -199,7 +200,7 @@ func (locksmith *LockSmith) Election() {
 	locksmith.Coordinator = coordinator
 
 	// Send message to node to turn coordinator field to true
-	locksmith.LockSmithNode.SendSignal(coordinator, &rpc.Data{
+	locksmith.LockSmithNode.SendSignal(coordinator, &data.Data{
 		From: locksmith.LockSmithNode.Pid,
 		To:   coordinator,
 		Payload: map[string]interface{}{
@@ -216,8 +217,8 @@ func (locksmith *LockSmith) Election() {
 
 // Spawn new nodes when a node is down
 func (locksmith *LockSmith) SpawnNewNode(n int) {
-	nodeRecvChan := make(chan *rpc.Data, 1)
-	nodeSendChan := make(chan *rpc.Data, 1)
+	nodeRecvChan := make(chan *data.Data, 1)
+	nodeSendChan := make(chan *data.Data, 1)
 	isCoordinator := false
 	newNode := &rpc.Node{
 		IsCoordinator: &isCoordinator,
