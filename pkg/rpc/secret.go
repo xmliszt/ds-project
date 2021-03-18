@@ -6,7 +6,6 @@ import (
 )
 
 type Secret struct {
-	// Key   int
 	Value string // Value of secret
 	Role  int    // Int to identify role (clearance level)
 }
@@ -68,7 +67,6 @@ func (n *Node) DeleteSecret(key string) error {
 		delete(allData, key)
 		overwriteError := n.OverwriteDataFile(allData)
 		if overwriteError != nil {
-			// fmt.Println(overwriteError)
 			return overwriteError
 		}
 		return nil

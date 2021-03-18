@@ -96,9 +96,9 @@ func TestSpawnNewNode(t *testing.T) {
 			RpcMap: make(map[int]chan *rpc.Data),
 		},
 		Nodes: map[int]*rpc.Node{
-			1: &rpc.Node{},
-			2: &rpc.Node{},
-			3: &rpc.Node{},
+			1: {},
+			2: {},
+			3: {},
 		},
 		HeartBeatTable: map[int]bool{
 			1: true,
@@ -129,13 +129,13 @@ func TestElection(t *testing.T) {
 			},
 		},
 		Nodes: map[int]*rpc.Node{
-			1: &rpc.Node{},
-			2: &rpc.Node{},
-			3: &rpc.Node{
+			1: {},
+			2: {},
+			3: {
 				RecvChannel:   mockChan,
 				IsCoordinator: &iscoordinator,
 			},
-			4: &rpc.Node{},
+			4: {},
 		},
 		HeartBeatTable: map[int]bool{
 			1: true,
