@@ -39,15 +39,15 @@ func Start() error {
 func InitializeLocksmith() *LockSmith {
 	receivingChannel := make(chan *data.Data, 1)
 	sendingChannel := make(chan *data.Data, 1)
-	isCoordinator := false
 	locksmithServer := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			IsCoordinator: &isCoordinator,
-			Pid:           0,
-			RecvChannel:   receivingChannel,
-			SendChannel:   sendingChannel,
-			Ring:          make([]int, 0),
-			RpcMap:        make(map[int]chan *data.Data),
+			IsCoordinator:  false,
+			Pid:            0,
+			RecvChannel:    receivingChannel,
+			SendChannel:    sendingChannel,
+			Ring:           make([]int, 0),
+			RpcMap:         make(map[int]chan *data.Data),
+			HeartBeatTable: make(map[int]bool),
 		},
 		Nodes:          make(map[int]*rpc.Node),
 		HeartBeatTable: make(map[int]bool),
@@ -61,12 +61,12 @@ func (locksmith *LockSmith) InitializeNodes(n int) {
 	for i := 1; i <= n; i++ {
 		nodeRecvChan := make(chan *data.Data, 1)
 		nodeSendChan := make(chan *data.Data, 1)
-		isCoordinator := false
 		newNode := &rpc.Node{
-			IsCoordinator: &isCoordinator,
-			Pid:           i,
-			RecvChannel:   nodeRecvChan,
-			SendChannel:   nodeSendChan,
+			IsCoordinator:  false,
+			Pid:            i,
+			RecvChannel:    nodeRecvChan,
+			SendChannel:    nodeSendChan,
+			HeartBeatTable: make(map[int]bool),
 		}
 		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, i)
 		locksmith.Nodes[i] = newNode
@@ -135,7 +135,7 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
 
 							// Election process
-							if *locksmith.Nodes[pid].IsCoordinator {
+							if locksmith.Nodes[pid].IsCoordinator {
 								locksmith.Election()
 							}
 
@@ -205,17 +205,14 @@ func (locksmith *LockSmith) Election() {
 			"data": nil,
 		},
 	})
-
-	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }
 
 // Spawn new nodes when a node is down
 func (locksmith *LockSmith) SpawnNewNode(n int) {
 	nodeRecvChan := make(chan *data.Data, 1)
 	nodeSendChan := make(chan *data.Data, 1)
-	isCoordinator := false
 	newNode := &rpc.Node{
-		IsCoordinator: &isCoordinator,
+		IsCoordinator: false,
 		Pid:           n,
 		RecvChannel:   nodeRecvChan,
 		SendChannel:   nodeSendChan,

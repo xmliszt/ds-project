@@ -23,8 +23,9 @@ func TestInitializeLocksmith(t *testing.T) {
 func TestInitializeNodes(t *testing.T) {
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			Ring:   make([]int, 0),
-			RpcMap: make(map[int]chan *data.Data),
+			Ring:           make([]int, 0),
+			RpcMap:         make(map[int]chan *data.Data),
+			HeartBeatTable: make(map[int]bool),
 		},
 		Nodes: make(map[int]*rpc.Node),
 	}
@@ -70,11 +71,10 @@ func TestStartAllNodes(t *testing.T) {
 	}
 	locksmith.Nodes = make(map[int]*rpc.Node)
 	locksmith.HeartBeatTable = make(map[int]bool)
-	iscoordinator := false
 	for i := 1; i <= 3; i++ {
 		newNode := &rpc.Node{
 			Pid:           i,
-			IsCoordinator: &iscoordinator,
+			IsCoordinator: false,
 			RecvChannel:   make(chan *data.Data),
 		}
 		locksmith.Nodes[i] = newNode
@@ -120,23 +120,19 @@ func TestSpawnNewNode(t *testing.T) {
 }
 
 func TestElection(t *testing.T) {
-	mockChan := make(chan *data.Data)
-	iscoordinator := false
+	mockChan := make(chan *data.Data, 1)
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			Ring: make([]int, 0),
 			RpcMap: map[int]chan *data.Data{
 				3: mockChan,
 			},
 		},
 		Nodes: map[int]*rpc.Node{
-			1: {},
-			2: {},
 			3: {
+				Pid:           3,
+				IsCoordinator: false,
 				RecvChannel:   mockChan,
-				IsCoordinator: &iscoordinator,
 			},
-			4: {},
 		},
 		HeartBeatTable: map[int]bool{
 			1: true,
@@ -148,7 +144,7 @@ func TestElection(t *testing.T) {
 	locksmith.Nodes[3].Start()
 	locksmith.Election()
 	time.Sleep(time.Second * 2)
-	if !*locksmith.Nodes[3].IsCoordinator {
+	if !locksmith.Nodes[3].IsCoordinator {
 		t.Error("Node 3 supposed to be coordinator but it is not!")
 	}
 }

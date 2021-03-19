@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/data"
@@ -13,13 +12,21 @@ import (
 
 // Node contains all the variables that are necessary to manage a node
 type Node struct {
-	IsCoordinator  *bool                   `validate:"required"`
+	IsCoordinator  bool
 	Pid            int                     `validate:"gte=0"`    // Node ID
 	Ring           []int                   `validate:"required"` // Ring structure of nodes
 	RecvChannel    chan *data.Data         `validate:"required"` // Receiving channel
 	SendChannel    chan *data.Data         `validate:"required"` // Sending channel
 	RpcMap         map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
-	HeartBeatTable map[int]bool            // Heartbeat table
+	HeartBeatTable map[int]bool            `validate:"required"` // Heartbeat table
+	Handler        NodeHandler
+}
+
+type NodeHandler interface {
+	Start()
+	TearDown()
+	HandlerMessageReceived()
+	HandleAPIRequests()
 }
 
 // HandleMessageReceived is a Go routine that handles the messages received
@@ -40,8 +47,8 @@ func (n *Node) HandleMessageReceived() {
 			heartbeatTable := msg.Payload["data"]
 			n.HeartBeatTable = heartbeatTable.(map[int]bool)
 		case "YOU_ARE_COORDINATOR":
-			isCoordinator := true
-			n.IsCoordinator = &isCoordinator
+			n.IsCoordinator = true
+			fmt.Printf("Node [%d] is assigned to be the new coordinator!\n", n.Pid)
 			go n.HandleAPIRequests()
 		}
 	}
@@ -62,21 +69,16 @@ func (n *Node) TearDown() {
 
 // API Requests Handlers
 func (n *Node) HandleAPIRequests() {
-	log.Printf("Node %d listening to client's requests...\n", n.Pid)
 	config, err := config.GetConfig()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	router := mux.NewRouter().StrictSlash(true)
 
-	// General
-	router.HandleFunc("/", api.Home).Methods("GET")
+	log.Printf("Node %d listening to client's requests...\n", n.Pid)
+	router := api.GetRouter()
 
-	// User
-	router.HandleFunc("/user", api.CreateUser).Methods("POST")
-
-	// Secret
-	router.HandleFunc("/secret", api.GetSecret).Methods("GET")
-	router.HandleFunc("/secret", api.PutSecret).Methods("POST")
-	log.Fatal(http.ListenAndServe(":"+fmt.Sprintf("%d", config.ConfigServer.Port), router))
+	err = http.ListenAndServe(":"+fmt.Sprintf("%d", config.ConfigServer.Port), &router)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
