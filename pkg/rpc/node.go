@@ -3,17 +3,19 @@ package rpc
 import (
 	"fmt"
 	"time"
+
+	"github.com/xmliszt/e-safe/pkg/data"
 )
 
 // Node contains all the variables that are necessary to manage a node
 type Node struct {
-	IsCoordinator  *bool              `validate:"required"`
-	Pid            int                `validate:"gte=0"`    // Node ID
-	Ring           []int              `validate:"required"` // Ring structure of nodes
-	RecvChannel    chan *Data         `validate:"required"` // Receiving channel
-	SendChannel    chan *Data         `validate:"required"` // Sending channel
-	RpcMap         map[int]chan *Data `validate:"required"` // Map node ID to their receiving channels
-	HeartBeatTable map[int]bool       // Heartbeat table
+	IsCoordinator  *bool                   `validate:"required"`
+	Pid            int                     `validate:"gte=0"`    // Node ID
+	Ring           []int                   `validate:"required"` // Ring structure of nodes
+	RecvChannel    chan *data.Data         `validate:"required"` // Receiving channel
+	SendChannel    chan *data.Data         `validate:"required"` // Sending channel
+	RpcMap         map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
+	HeartBeatTable map[int]bool            // Heartbeat table
 }
 
 // HandleMessageReceived is a Go routine that handles the messages received
@@ -30,7 +32,7 @@ func (n *Node) HandleMessageReceived() {
 	for msg := range n.RecvChannel {
 		switch msg.Payload["type"] {
 		case "CHECK_HEARTBEAT":
-			n.SendSignal(0, &Data{
+			n.SendSignal(0, &data.Data{
 				From: n.Pid,
 				To:   0,
 				Payload: map[string]interface{}{

@@ -1,7 +1,7 @@
-package rpc
+package data
 
 type Data struct {
-	From int
-	To int
+	From    int
+	To      int
 	Payload map[string]interface{}
 }

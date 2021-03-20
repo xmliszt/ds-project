@@ -1,4 +1,4 @@
-package rpc
+package file
 
 import (
 	"encoding/json"
@@ -11,15 +11,25 @@ import (
 
 // FileMethods contains all the methods associated with manipulating OS files
 type FileMethods interface {
-	ReadUsersFile() map[string]User
+	ReadUsersFile() map[string]interface{}
 	WriteUsersFile()
-	ReadDataFile() map[string]Secret
+	ReadDataFile() map[string]interface{}
 	WriteDataFile()
+}
+
+func dataFilePathNode(nodePID int) (string, error) {
+	id := strconv.Itoa(nodePID)
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dataFilePath := filepath.Join(cwd, "nodeStorage", "node"+id, "data.json")
+	return dataFilePath, nil
 }
 
 // ReadUsersFile returns all the information from the global users.json file
 // Code adapted from: https://tutorialedge.net/golang/parsing-json-with-golang/
-func (n *Node) ReadUsersFile() (map[string]User, error) {
+func ReadUsersFile() (map[string]interface{}, error) {
 
 	cwd, err := os.Getwd()
 	fmt.Println(cwd)
@@ -33,8 +43,6 @@ func (n *Node) ReadUsersFile() (map[string]User, error) {
 		return nil, osErr
 	}
 
-	fmt.Println("Successfully Opened users.json")
-
 	defer jsonFile.Close()
 
 	byteValue, readAllError := ioutil.ReadAll(jsonFile)
@@ -42,7 +50,7 @@ func (n *Node) ReadUsersFile() (map[string]User, error) {
 		return nil, readAllError
 	}
 
-	var fileContents map[string]User
+	var fileContents map[string]interface{}
 
 	// Unmarshal parses the byteValue array to a type defined by fileContents
 	marshalError := json.Unmarshal([]byte(byteValue), &fileContents)
@@ -53,9 +61,9 @@ func (n *Node) ReadUsersFile() (map[string]User, error) {
 }
 
 // ReadDataFile returns all the information from the data.json of the respective node's local file
-func (n *Node) ReadDataFile() (map[string]Secret, error) {
+func ReadDataFile(pid int) (map[string]interface{}, error) {
 
-	filePath, err := dataFilePathNode(n.Pid)
+	filePath, err := dataFilePathNode(pid)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +73,6 @@ func (n *Node) ReadDataFile() (map[string]Secret, error) {
 		return nil, osErr
 	}
 
-	fmt.Println("Successfully Opened", filePath)
-
 	defer jsonFile.Close()
 
 	byteValue, readAllError := ioutil.ReadAll(jsonFile)
@@ -74,7 +80,7 @@ func (n *Node) ReadDataFile() (map[string]Secret, error) {
 		return nil, readAllError
 	}
 
-	var fileContents map[string]Secret
+	var fileContents map[string]interface{}
 	marshalError := json.Unmarshal([]byte(byteValue), &fileContents)
 	if marshalError != nil { // if we os.Open returns an error then handle it
 		return nil, marshalError
@@ -84,21 +90,18 @@ func (n *Node) ReadDataFile() (map[string]Secret, error) {
 }
 
 // WriteUsersFile takes updates the user file with the new users provided
-func (n *Node) WriteUsersFile(addUsers map[string]User) error {
+func WriteUsersFile(addUsers map[string]interface{}) error {
 
-	originalFileContent, readError := n.ReadUsersFile()
+	originalFileContent, readError := ReadUsersFile()
 
 	if readError != nil {
 		return readError
 	}
-	fmt.Println("Original:\n", originalFileContent)
 
 	// Update the values from the file
 	for key, value := range addUsers {
 		originalFileContent[key] = value
 	}
-
-	fmt.Println("Edited:\n", originalFileContent)
 
 	file, marshallError := json.MarshalIndent(originalFileContent, "", " ")
 	if marshallError != nil {
@@ -120,24 +123,21 @@ func (n *Node) WriteUsersFile(addUsers map[string]User) error {
 }
 
 // WriteDataFile taks in the variable with map type then update the user file
-func (n *Node) WriteDataFile(addData map[string]Secret) error {
+func WriteDataFile(pid int, addData map[string]interface{}) error {
 
-	filePath, err := dataFilePathNode(n.Pid)
+	filePath, err := dataFilePathNode(pid)
 	if err != nil {
 		return err
 	}
-	originalFileContent, readError := n.ReadDataFile()
+	originalFileContent, readError := ReadDataFile(pid)
 
 	if readError != nil {
 		return readError
 	}
-	fmt.Println("Original:\n", originalFileContent)
 
 	for key, value := range addData {
 		originalFileContent[key] = value
 	}
-
-	fmt.Println("Edited:\n", originalFileContent)
 
 	file, marshallError := json.MarshalIndent(originalFileContent, "", " ")
 	if marshallError != nil {
@@ -151,20 +151,10 @@ func (n *Node) WriteDataFile(addData map[string]Secret) error {
 	return nil
 }
 
-func dataFilePathNode(nodePID int) (string, error) {
-	id := strconv.Itoa(nodePID)
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	dataFilePath := filepath.Join(cwd, "nodeStorage", "node"+id, "data.json")
-	return dataFilePath, nil
-}
-
 // OverwriteDatafromFile taks in the variable with map type then update the user file
-func (n *Node) OverwriteDataFile(addData map[string]Secret) error {
+func OverwriteDataFile(pid int, addData map[string]interface{}) error {
 
-	filePath, err := dataFilePathNode(n.Pid)
+	filePath, err := dataFilePathNode(pid)
 
 	if err != nil {
 		return err

@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"fmt"
+
+	"github.com/xmliszt/e-safe/pkg/data"
 )
 
 type Signal interface {
@@ -9,7 +11,7 @@ type Signal interface {
 }
 
 // SendSignal used for sending request to target Node
-func (n Node) SendSignal(pid int, data *Data) {
+func (n *Node) SendSignal(pid int, data *data.Data) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println(r)
