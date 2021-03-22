@@ -2,9 +2,12 @@ package rpc
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/xmliszt/e-safe/pkg/data"
+	"github.com/xmliszt/e-safe/pkg/file"
 )
 
 // Node contains all the variables that are necessary to manage a node
@@ -14,6 +17,7 @@ type Node struct {
 	Ring           []int                   `validate:"required"` // Ring structure of nodes
 	RecvChannel    chan *data.Data         `validate:"required"` // Receiving channel
 	SendChannel    chan *data.Data         `validate:"required"` // Sending channel
+	RingMap        map[int]string          `validate:"required"` // Map each virtual node's range to it's description
 	RpcMap         map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
 	HeartBeatTable map[int]bool            // Heartbeat table
 }
@@ -46,6 +50,47 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
+		case "STORE_DATA":
+			receivedPayload := msg.Payload["data"]                       // This should be the Secret
+			hashedValue := fmt.Sprintf("%v", msg.Payload["hashedValue"]) // This should be the hashed value omt for that secret
+			mapPayload := map[string]interface{}{
+				hashedValue: receivedPayload,
+			}
+			file.WriteDataFile(n.Pid, mapPayload)
+			// How are we going from n.Pid to next_id
+			// hashedValue -> current virtual node number (1-1)
+			// using Ring, current virtual node number -> next virtual node number
+			var next_pid int
+			for index, x := range n.Ring {
+
+				hashedValueINT, err := strconv.Atoi(hashedValue)
+				if err != nil {
+					fmt.Println(err)
+				}
+				if hashedValueINT < x {
+					// current_virtual_node := n.RingMap[x]
+					next_virtual_node := n.RingMap[n.Ring[(index+1)]]
+					string_list := strings.Split(next_virtual_node, "-")
+					next_pid, err = strconv.Atoi(string_list[0])
+					if err != nil {
+						fmt.Println(err)
+					}
+					break
+
+				}
+
+			}
+			n.SendSignal(next_pid, &data.Data{
+				From: n.Pid,
+				To:   next_pid,
+				Payload: map[string]interface{}{
+					"type": "STRICT_CONSISTENCY",
+					"data": mapPayload,
+				},
+			})
+		case "STRICT_CONSISTENCY":
+
+			//SendSignal for ack to owner node
 		}
 	}
 }
