@@ -54,10 +54,13 @@ var lock = &sync.Mutex{}
 
 var globalConfig *Config
 
-func GetHash(s string) uint32 {
+func GetHash(s string) (uint32, error) {
 	h := fnv.New32a()
-	h.Write([]byte(s))
-	return h.Sum32()
+	_, err := h.Write([]byte(s))
+	if err != nil {
+		return 0, err
+	}
+	return h.Sum32(), nil
 }
 
 // GetConfig is a singleton method that gets the loaded configuration object

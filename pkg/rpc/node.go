@@ -68,7 +68,10 @@ func (n *Node) CreateVirtualNodes(Pid int) error {
 
 	for i := 1; i <= conf.VirtualNodesCount; i++ {
 		virtualNode := strconv.Itoa(Pid) + "-" + strconv.Itoa(i)
-		location := config.GetHash(virtualNode)
+		location, e := config.GetHash(virtualNode)
+		if e != nil {
+			return e
+		}
 		fmt.Println("Virtual node ", virtualNode, "has started")
 		n.SendSignal(0, &data.Data{
 			From: Pid,
