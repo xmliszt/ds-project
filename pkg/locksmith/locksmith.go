@@ -107,6 +107,7 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 			// Sort the location array
 			sort.Ints(locksmith.LockSmithNode.VirtualNodeLocation)
 
+			fmt.Printf("---Map of virtual node's 'Location' : 'Virtual Node Id'---\n%v\n---Array of virtual node's location---\n%v\n", locksmith.LockSmithNode.VirtualNodeMap, locksmith.LockSmithNode.VirtualNodeLocation)
 			// Broadcast to other nodes
 			for _, pid := range locksmith.LockSmithNode.Ring {
 				locksmith.LockSmithNode.SendSignal(pid, &data.Data{
