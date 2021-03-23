@@ -66,12 +66,14 @@ func TestHandleMessageReceived(t *testing.T) {
 func TestStartAllNodes(t *testing.T) {
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			Pid:    0,
-			Ring:   make([]int, 0),
-			RpcMap: make(map[int]chan *data.Data),
+			Pid:         0,
+			Ring:        make([]int, 0),
+			RpcMap:      make(map[int]chan *data.Data),
+			RecvChannel: make(chan *data.Data),
 		},
 	}
 	locksmith.Nodes = make(map[int]*rpc.Node)
+	locksmith.LockSmithNode.RpcMap[0] = locksmith.LockSmithNode.RecvChannel
 	locksmith.LockSmithNode.HeartBeatTable = make(map[int]bool)
 	iscoordinator := false
 	for i := 1; i <= 3; i++ {
@@ -79,12 +81,19 @@ func TestStartAllNodes(t *testing.T) {
 			Pid:           i,
 			IsCoordinator: &iscoordinator,
 			RecvChannel:   make(chan *data.Data),
+			RpcMap: map[int]chan *data.Data{
+				0: locksmith.LockSmithNode.RecvChannel,
+			},
 		}
 		locksmith.Nodes[i] = newNode
 		locksmith.LockSmithNode.RpcMap[i] = newNode.RecvChannel
 		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, i)
 	}
-	locksmith.StartAllNodes()
+	go locksmith.LockSmithNode.HandleMessageReceived()
+	err := locksmith.StartAllNodes()
+	if err != nil {
+		t.Error(err)
+	}
 	for pid, alive := range locksmith.LockSmithNode.HeartBeatTable {
 		if !alive {
 			t.Errorf("Expected Node [%d] to be alive, but yet it is not alive!", pid)
@@ -148,7 +157,8 @@ func TestElection(t *testing.T) {
 			4: {},
 		},
 	}
-	locksmith.Nodes[3].Start()
+	locksmith.Nodes[3].StartDeadNode()
+
 	locksmith.Election()
 	time.Sleep(time.Second * 2)
 	if !*locksmith.Nodes[3].IsCoordinator {

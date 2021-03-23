@@ -1,9 +1,12 @@
 package config
 
 import (
+	"fmt"
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v2"
@@ -69,11 +72,12 @@ func GetConfig() (*Config, error) {
 		lock.Lock()
 		defer lock.Unlock()
 		if globalConfig == nil {
-			cwd, err := os.Getwd()
-			if err != nil {
-				return nil, err
-			}
-			configPath := filepath.Join(cwd, "config.yaml")
+			_, file, _, _ := runtime.Caller(0)
+			paths := strings.Split(file, "/")
+			paths = paths[:len(paths)-2]
+			rootPath := "/" + filepath.Join(paths...)
+			fmt.Println(rootPath)
+			configPath := filepath.Join(rootPath, "config.yaml")
 			config, err := LoadConfig(configPath)
 			if err != nil {
 				return nil, err

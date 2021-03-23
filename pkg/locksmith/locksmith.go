@@ -32,7 +32,10 @@ func Start() error {
 	go locksmithServer.HandleMessageReceived() // Run this as the main go routine, so do not need to create separate go routine
 	locksmithServer.InitializeNodes(config.Number)
 	fmt.Println("Locksmith [0] has started")
-	locksmithServer.StartAllNodes()
+	e := locksmithServer.StartAllNodes()
+	if e != nil {
+		return e
+	}
 
 	locksmithServer.CheckHeartbeat() // Start periodically checking Node's heartbeat
 
@@ -125,9 +128,12 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 }
 
 // StartAllNodes starts up all created nodes
-func (locksmith *LockSmith) StartAllNodes() {
+func (locksmith *LockSmith) StartAllNodes() error {
 	for pid, node := range locksmith.Nodes {
-		node.Start()
+		err := node.Start()
+		if err != nil {
+			return err
+		}
 		locksmith.LockSmithNode.HeartBeatTable[pid] = true
 	}
 	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
@@ -140,6 +146,7 @@ func (locksmith *LockSmith) StartAllNodes() {
 			"data": nil,
 		},
 	})
+	return nil
 }
 
 // CheckHeartbeat periodically check if node is alive
