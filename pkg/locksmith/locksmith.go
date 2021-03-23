@@ -12,10 +12,10 @@ import (
 )
 
 type LockSmith struct {
-	LockSmithNode  *rpc.Node         `validate:"required"`
-	Nodes          map[int]*rpc.Node `validate:"required"`
-	HeartBeatTable map[int]bool      `validate:"required"`
-	Coordinator    int
+	LockSmithNode *rpc.Node         `validate:"required"`
+	Nodes         map[int]*rpc.Node `validate:"required"`
+	// HeartBeatTable map[int]bool      `validate:"required"`
+	Coordinator int
 }
 
 // Start is the main function that starts the entire program
@@ -58,9 +58,9 @@ func InitializeLocksmith() (*LockSmith, error) {
 			RpcMap:              make(map[int]chan *data.Data),
 			VirtualNodeLocation: make([]int, 0),
 			VirtualNodeMap:      make(map[int]string),
+			HeartBeatTable:      make(map[int]bool),
 		},
-		Nodes:          make(map[int]*rpc.Node),
-		HeartBeatTable: make(map[int]bool),
+		Nodes: make(map[int]*rpc.Node),
 	}
 	locksmithServer.LockSmithNode.RpcMap[0] = receivingChannel // Add Locksmith receiving channel to RpcMap
 	return locksmithServer, nil
@@ -94,7 +94,7 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 	for msg := range locksmith.LockSmithNode.RecvChannel {
 		switch msg.Payload["type"] {
 		case "REPLY_HEARTBEAT":
-			locksmith.HeartBeatTable[msg.From] = true
+			locksmith.LockSmithNode.HeartBeatTable[msg.From] = true
 		case "UPDATE_VIRTUAL_NODE":
 			location := int(msg.Payload["locationData"].(uint32))
 			virtualNode := msg.Payload["virtualNodeData"]
@@ -127,7 +127,7 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 func (locksmith *LockSmith) StartAllNodes() {
 	for pid, node := range locksmith.Nodes {
 		node.Start()
-		locksmith.HeartBeatTable[pid] = true
+		locksmith.LockSmithNode.HeartBeatTable[pid] = true
 	}
 	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
 	// Send message to node to turn coordinator field to true
@@ -151,9 +151,9 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 	for {
 		for _, pid := range locksmith.LockSmithNode.Ring {
 			time.Sleep(time.Second * time.Duration(config.HeartbeatInterval))
-			if locksmith.HeartBeatTable[pid] {
+			if locksmith.LockSmithNode.HeartBeatTable[pid] {
 				go func(pid int) {
-					locksmith.HeartBeatTable[pid] = false
+					locksmith.LockSmithNode.HeartBeatTable[pid] = false
 					locksmith.LockSmithNode.SendSignal(pid, &data.Data{
 						From: locksmith.LockSmithNode.Pid,
 						To:   pid,
@@ -163,10 +163,10 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						},
 					})
 					time.Sleep(time.Second * 1)
-					fmt.Println("Heartbeat Table: ", locksmith.HeartBeatTable)
-					if !locksmith.HeartBeatTable[pid] {
+					fmt.Println("Heartbeat Table: ", locksmith.LockSmithNode.HeartBeatTable)
+					if !locksmith.LockSmithNode.HeartBeatTable[pid] {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
-						if !locksmith.HeartBeatTable[pid] {
+						if !locksmith.LockSmithNode.HeartBeatTable[pid] {
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
 							fmt.Println("LOCKSMITH", locksmith.LockSmithNode.VirtualNodeMap)
 							fmt.Println(locksmith.Nodes[pid].VirtualNodeMap)
@@ -204,7 +204,7 @@ func (locksmith *LockSmith) BroadcastHeartbeatTable() {
 			To:   pid,
 			Payload: map[string]interface{}{
 				"type": "UPDATE_HEARTBEAT",
-				"data": locksmith.HeartBeatTable,
+				"data": locksmith.LockSmithNode.HeartBeatTable,
 			},
 		})
 		fmt.Printf("Node [%d] has updated its heartbeat table from locksmith\n", pid)
@@ -213,7 +213,7 @@ func (locksmith *LockSmith) BroadcastHeartbeatTable() {
 }
 
 func (locksmith *LockSmith) DeadNodeChecker() {
-	for k, v := range locksmith.HeartBeatTable {
+	for k, v := range locksmith.LockSmithNode.HeartBeatTable {
 		if !v {
 			locksmith.SpawnNewNode(k)
 			fmt.Printf("Node [%d] has been revived!\n", k)
@@ -225,7 +225,7 @@ func (locksmith *LockSmith) DeadNodeChecker() {
 func (locksmith *LockSmith) Election() {
 	var potentialCandidate []int
 
-	for k, v := range locksmith.HeartBeatTable {
+	for k, v := range locksmith.LockSmithNode.HeartBeatTable {
 		if v {
 			potentialCandidate = append(potentialCandidate, k)
 		}
@@ -263,7 +263,7 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 	locksmith.LockSmithNode.RpcMap[n] = nodeRecvChan
 
 	locksmith.Nodes[n].StartDeadNode()
-	locksmith.HeartBeatTable[n] = true
+	locksmith.LockSmithNode.HeartBeatTable[n] = true
 
 	// Update ring
 	found := util.IntInSlice(locksmith.LockSmithNode.Ring, n)

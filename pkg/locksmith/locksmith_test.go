@@ -49,15 +49,15 @@ func TestHandleMessageReceived(t *testing.T) {
 	receivingChannel := make(chan *data.Data, 1)
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			RecvChannel: receivingChannel,
+			RecvChannel:    receivingChannel,
+			HeartBeatTable: make(map[int]bool),
 		},
-		HeartBeatTable: make(map[int]bool),
 	}
-	locksmith.HeartBeatTable[1] = false
+	locksmith.LockSmithNode.HeartBeatTable[1] = false
 	go locksmith.HandleMessageReceived()
 	locksmith.LockSmithNode.RecvChannel <- &data.Data{From: 1, Payload: map[string]interface{}{"type": "REPLY_HEARTBEAT"}}
 	time.Sleep(time.Second * 1)
-	if !locksmith.HeartBeatTable[1] {
+	if !locksmith.LockSmithNode.HeartBeatTable[1] {
 		t.Errorf("Expected HeartbeatTable for Node 1 to be true, but instead it is still false.")
 	}
 }
@@ -72,7 +72,7 @@ func TestStartAllNodes(t *testing.T) {
 		},
 	}
 	locksmith.Nodes = make(map[int]*rpc.Node)
-	locksmith.HeartBeatTable = make(map[int]bool)
+	locksmith.LockSmithNode.HeartBeatTable = make(map[int]bool)
 	iscoordinator := false
 	for i := 1; i <= 3; i++ {
 		newNode := &rpc.Node{
@@ -85,7 +85,7 @@ func TestStartAllNodes(t *testing.T) {
 		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, i)
 	}
 	locksmith.StartAllNodes()
-	for pid, alive := range locksmith.HeartBeatTable {
+	for pid, alive := range locksmith.LockSmithNode.HeartBeatTable {
 		if !alive {
 			t.Errorf("Expected Node [%d] to be alive, but yet it is not alive!", pid)
 		}
@@ -98,17 +98,17 @@ func TestSpawnNewNode(t *testing.T) {
 		LockSmithNode: &rpc.Node{
 			Ring:   make([]int, 0),
 			RpcMap: make(map[int]chan *data.Data),
+			HeartBeatTable: map[int]bool{
+				1: true,
+				2: true,
+				3: true,
+				4: false,
+			},
 		},
 		Nodes: map[int]*rpc.Node{
 			1: {},
 			2: {},
 			3: {},
-		},
-		HeartBeatTable: map[int]bool{
-			1: true,
-			2: true,
-			3: true,
-			4: false,
 		},
 	}
 
@@ -131,6 +131,12 @@ func TestElection(t *testing.T) {
 			RpcMap: map[int]chan *data.Data{
 				3: mockChan,
 			},
+			HeartBeatTable: map[int]bool{
+				1: true,
+				2: true,
+				3: true,
+				4: false,
+			},
 		},
 		Nodes: map[int]*rpc.Node{
 			1: {},
@@ -140,12 +146,6 @@ func TestElection(t *testing.T) {
 				IsCoordinator: &iscoordinator,
 			},
 			4: {},
-		},
-		HeartBeatTable: map[int]bool{
-			1: true,
-			2: true,
-			3: true,
-			4: false,
 		},
 	}
 	locksmith.Nodes[3].Start()
