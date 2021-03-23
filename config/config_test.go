@@ -12,11 +12,12 @@ var expectedConfig = &Config{
 		Port: 8080,
 	},
 	ConfigNode: ConfigNode{
-		Number: 5,
+		Number:            5,
 		HeartbeatInterval: 5,
+		VirtualNodesCount: 3,
 	},
 	ConfigTimeout: ConfigTimeout{
-		HeartBeatTimeout: 15,
+		HeartBeatTimeout:    15,
 		NodeCreationTimeout: 60,
 	},
 }
