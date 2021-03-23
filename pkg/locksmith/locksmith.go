@@ -14,8 +14,7 @@ import (
 type LockSmith struct {
 	LockSmithNode *rpc.Node         `validate:"required"`
 	Nodes         map[int]*rpc.Node `validate:"required"`
-	// HeartBeatTable map[int]bool      `validate:"required"`
-	Coordinator int
+	Coordinator   int
 }
 
 // Start is the main function that starts the entire program
