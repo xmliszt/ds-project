@@ -87,12 +87,16 @@ func (n *Node) CreateVirtualNodes(Pid int) error {
 }
 
 // Start starts up a node, running receiving channel
-func (n *Node) Start() {
+func (n *Node) Start() error {
 	fmt.Printf("Node [%d] has started!\n", n.Pid)
 
 	// Create virtual node
-	n.CreateVirtualNodes(n.Pid)
+	err := n.CreateVirtualNodes(n.Pid)
+	if err != nil {
+		return err
+	}
 	go n.HandleMessageReceived()
+	return nil
 }
 
 // Start starts up a node, running receiving channel
