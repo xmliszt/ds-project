@@ -2,6 +2,7 @@ package locksmith
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/xmliszt/e-safe/config"
@@ -24,36 +25,45 @@ func Start() error {
 		return err
 	}
 
-	locksmithServer := InitializeLocksmith()
+	locksmithServer, err := InitializeLocksmith()
+	if err != nil {
+		return err
+	}
+	go locksmithServer.HandleMessageReceived() // Run this as the main go routine, so do not need to create separate go routine
 	locksmithServer.InitializeNodes(config.Number)
+	fmt.Println("Locksmith [0] has started")
 	locksmithServer.StartAllNodes()
 
-	fmt.Println("Locksmith [0] has started")
-	go locksmithServer.CheckHeartbeat()     // Start periodically checking Node's heartbeat
-	locksmithServer.HandleMessageReceived() // Run this as the main go routine, so do not need to create separate go routine
+	locksmithServer.CheckHeartbeat() // Start periodically checking Node's heartbeat
 
 	return nil
 }
 
 // InitializeLocksmith initializes the locksmith server object
-func InitializeLocksmith() *LockSmith {
-	receivingChannel := make(chan *data.Data, 1)
-	sendingChannel := make(chan *data.Data, 1)
+func InitializeLocksmith() (*LockSmith, error) {
+	config, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	receivingChannel := make(chan *data.Data, config.Number*config.VirtualNodesCount)
+	sendingChannel := make(chan *data.Data, config.Number*config.VirtualNodesCount)
 	isCoordinator := false
 	locksmithServer := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			IsCoordinator: &isCoordinator,
-			Pid:           0,
-			RecvChannel:   receivingChannel,
-			SendChannel:   sendingChannel,
-			Ring:          make([]int, 0),
-			RpcMap:        make(map[int]chan *data.Data),
+			IsCoordinator:       &isCoordinator,
+			Pid:                 0,
+			RecvChannel:         receivingChannel,
+			SendChannel:         sendingChannel,
+			Ring:                make([]int, 0),
+			RpcMap:              make(map[int]chan *data.Data),
+			VirtualNodeLocation: make([]int, 0),
+			VirtualNodeMap:      make(map[int]string),
 		},
 		Nodes:          make(map[int]*rpc.Node),
 		HeartBeatTable: make(map[int]bool),
 	}
 	locksmithServer.LockSmithNode.RpcMap[0] = receivingChannel // Add Locksmith receiving channel to RpcMap
-	return locksmithServer
+	return locksmithServer, nil
 }
 
 // InitializeNodes initializes the number n nodes that Locksmith is going to create
@@ -85,6 +95,30 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 		switch msg.Payload["type"] {
 		case "REPLY_HEARTBEAT":
 			locksmith.HeartBeatTable[msg.From] = true
+		case "UPDATE_VIRTUAL_NODE":
+			location := int(msg.Payload["locationData"].(uint32))
+			virtualNode := msg.Payload["virtualNodeData"]
+			fmt.Println("Locksmith has received from ", virtualNode.(string))
+			// Update its own values
+			locksmith.LockSmithNode.VirtualNodeLocation = append(locksmith.LockSmithNode.VirtualNodeLocation, location)
+			locksmith.LockSmithNode.VirtualNodeMap[location] =
+				virtualNode.(string)
+
+			// Sort the location array
+			sort.Ints(locksmith.LockSmithNode.VirtualNodeLocation)
+
+			// Broadcast to other nodes
+			for _, pid := range locksmith.LockSmithNode.Ring {
+				locksmith.LockSmithNode.SendSignal(pid, &data.Data{
+					From: locksmith.LockSmithNode.Pid,
+					To:   pid,
+					Payload: map[string]interface{}{
+						"type":            "BROADCAST_VIRTUAL_NODES",
+						"virtualNodeData": locksmith.LockSmithNode.VirtualNodeMap,
+						"locationData":    locksmith.LockSmithNode.VirtualNodeLocation,
+					},
+				})
+			}
 		}
 	}
 }
@@ -134,7 +168,8 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.HeartBeatTable[pid] {
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
-
+							fmt.Println("LOCKSMITH", locksmith.LockSmithNode.VirtualNodeMap)
+							fmt.Println(locksmith.Nodes[pid].VirtualNodeMap)
 							// Election process
 							if *locksmith.Nodes[pid].IsCoordinator {
 								locksmith.Election()
@@ -209,9 +244,6 @@ func (locksmith *LockSmith) Election() {
 		},
 	})
 
-	// isCoordinator := true
-	// locksmith.Nodes[coordinator].IsCoordinator = &isCoordinator
-
 	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }
 
@@ -230,7 +262,7 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 	locksmith.Nodes[n] = newNode
 	locksmith.LockSmithNode.RpcMap[n] = nodeRecvChan
 
-	locksmith.Nodes[n].Start()
+	locksmith.Nodes[n].StartDeadNode()
 	locksmith.HeartBeatTable[n] = true
 
 	// Update ring

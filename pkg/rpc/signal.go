@@ -17,7 +17,7 @@ func (n *Node) SendSignal(pid int, data *data.Data) {
 			fmt.Println(r)
 		}
 	}()
-	fmt.Printf("[%d] -> [%d]: %v\n", n.Pid, pid, data)
+	fmt.Printf("[%d] -> [%d]: %v\n", n.Pid, pid, data.Payload["type"])
 	sendingChannel := n.RpcMap[pid]
 	sendingChannel <- data
 }

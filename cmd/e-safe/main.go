@@ -20,6 +20,7 @@ func main() {
 	// Demo locksmith checks heartbeat
 	if mode == 1 {
 		err := locksmith.Start()
+		fmt.Println(err)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"sync"
@@ -9,23 +10,24 @@ import (
 )
 
 type Config struct {
-	ConfigServer `yaml:"Server"`
-	ConfigNode `yaml:"Node"`
+	ConfigServer  `yaml:"Server"`
+	ConfigNode    `yaml:"Node"`
 	ConfigTimeout `yaml:"Timeout"`
 }
 
 type ConfigServer struct {
 	Host string `yaml:"Host"`
-	Port int `yaml:"Port"`
+	Port int    `yaml:"Port"`
 }
 
 type ConfigNode struct {
-	Number int `yaml:"Number"`
+	Number            int `yaml:"Number"`
 	HeartbeatInterval int `yaml:"HeartbeatInterval"`
+	VirtualNodesCount int `yaml:"VirtualNodesCount"`
 }
 
 type ConfigTimeout struct {
-	HeartBeatTimeout int `yaml:"HeartbeatTimeout"`
+	HeartBeatTimeout    int `yaml:"HeartbeatTimeout"`
 	NodeCreationTimeout int `yaml:"NodeCreationTimeout"`
 }
 
@@ -38,7 +40,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 	defer file.Close()
-	
+
 	d := yaml.NewDecoder(file)
 
 	if err := d.Decode(&cfg); err != nil {
@@ -51,6 +53,12 @@ func LoadConfig(path string) (*Config, error) {
 var lock = &sync.Mutex{}
 
 var globalConfig *Config
+
+func GetHash(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
+}
 
 // GetConfig is a singleton method that gets the loaded configuration object
 func GetConfig() (*Config, error) {

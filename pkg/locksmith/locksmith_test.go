@@ -12,8 +12,11 @@ import (
 // Expected a locksmith server to be created with all required fields
 func TestInitializeLocksmith(t *testing.T) {
 	validate := validator.New()
-	locksmith := InitializeLocksmith()
-	err := validate.Struct(locksmith)
+	locksmith, err := InitializeLocksmith()
+	if err != nil {
+		t.Error(err)
+	}
+	err = validate.Struct(locksmith)
 	if err != nil {
 		t.Error(err)
 	}
