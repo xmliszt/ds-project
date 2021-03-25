@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,6 +26,7 @@ type ConfigServer struct {
 type ConfigNode struct {
 	Number            int `yaml:"Number"`
 	HeartbeatInterval int `yaml:"HeartbeatInterval"`
+	VirtualNodesCount int `yaml:"VirtualNodesCount"`
 }
 
 type ConfigTimeout struct {
@@ -54,16 +57,26 @@ var lock = &sync.Mutex{}
 
 var globalConfig *Config
 
+func GetHash(s string) (uint32, error) {
+	h := fnv.New32a()
+	_, err := h.Write([]byte(s))
+	if err != nil {
+		return 0, err
+	}
+	return h.Sum32(), nil
+}
+
 // GetConfig is a singleton method that gets the loaded configuration object
 func GetConfig() (*Config, error) {
-	_, file, _, _ := runtime.Caller(0)
-	paths := strings.Split(file, "/")
-	paths = paths[:len(paths)-2]
-	rootPath := "/" + filepath.Join(paths...)
 	if globalConfig == nil {
 		lock.Lock()
 		defer lock.Unlock()
 		if globalConfig == nil {
+			_, file, _, _ := runtime.Caller(0)
+			paths := strings.Split(file, "/")
+			paths = paths[:len(paths)-2]
+			rootPath := "/" + filepath.Join(paths...)
+			fmt.Println(rootPath)
 			configPath := filepath.Join(rootPath, "config.yaml")
 			config, err := LoadConfig(configPath)
 			if err != nil {
