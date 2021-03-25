@@ -3,7 +3,6 @@ package rpc
 import (
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/api"
@@ -77,8 +76,5 @@ func (n *Node) HandleAPIRequests() {
 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
 	router := api.GetRouter()
 
-	err = http.ListenAndServe(":"+fmt.Sprintf("%d", config.ConfigServer.Port), &router)
-	if err != nil {
-		log.Fatal(err)
-	}
+	router.Start(fmt.Sprintf(":%d", config.Port))
 }

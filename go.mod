@@ -4,9 +4,10 @@ go 1.15
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
-	github.com/gorilla/mux v1.8.0
 	github.com/kr/text v0.2.0 // indirect
+	github.com/labstack/echo/v4 v4.2.1
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/stretchr/testify v1.7.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect

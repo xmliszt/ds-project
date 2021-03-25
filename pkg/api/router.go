@@ -1,19 +1,33 @@
 package api
 
-import "github.com/gorilla/mux"
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+)
 
-func GetRouter() mux.Router {
-	router := mux.NewRouter().StrictSlash(true)
+func GetRouter() *echo.Echo {
+	router := echo.New()
 
-	// General
-	router.HandleFunc("/", Home).Methods("GET")
+	apiRouter := router.Group("/api/v1")
+	dashboardRouter := router.Group("/")
+
+	// Bind JWT token auth to sub-routers
+	apiRouter.Use(middleware.JWT([]byte("secret")))
+	dashboardRouter.Use(middleware.JWT([]byte("secret")))
+
+	// Views
+	router.GET("/", Home)
+	dashboardRouter.GET("/dashboard", Dashboard)
 
 	// User
-	router.HandleFunc("/user", CreateUser).Methods("POST")
+	router.POST("/register", Register)
+	router.POST("/login", LogIn)
 
 	// Secret
-	router.HandleFunc("/secret", GetSecret).Methods("GET")
-	router.HandleFunc("/secret", PutSecret).Methods("POST")
+	apiRouter.GET("/secret", GetSecret)
+	apiRouter.PUT("/secret", PutSecret)
+	apiRouter.DELETE("/secret", DeleteSecret)
+	apiRouter.GET("/secrets", GetAllSecrets)
 
-	return *router
+	return router
 }
