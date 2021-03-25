@@ -6,20 +6,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/data"
 	"github.com/xmliszt/e-safe/pkg/file"
 )
 
 // Node contains all the variables that are necessary to manage a node
 type Node struct {
-	IsCoordinator  *bool                   `validate:"required"`
-	Pid            int                     `validate:"gte=0"`    // Node ID
-	Ring           []int                   `validate:"required"` // Ring structure of nodes
-	RecvChannel    chan *data.Data         `validate:"required"` // Receiving channel
-	SendChannel    chan *data.Data         `validate:"required"` // Sending channel
-	RingMap        map[int]string          `validate:"required"` // Map each virtual node's range to it's description
-	RpcMap         map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
-	HeartBeatTable map[int]bool            // Heartbeat table
+	IsCoordinator       *bool                   `validate:"required"`
+	Pid                 int                     `validate:"gte=0"`    // Node ID
+	Ring                []int                   `validate:"required"` // Ring structure of nodes
+	RecvChannel         chan *data.Data         `validate:"required"` // Receiving channel
+	SendChannel         chan *data.Data         `validate:"required"` // Sending channel
+	RpcMap              map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
+	HeartBeatTable      map[int]bool            // Heartbeat table
+	VirtualNodeLocation []int
+	VirtualNodeMap      map[int]string
 }
 
 // HandleMessageReceived is a Go routine that handles the messages received
@@ -28,7 +30,7 @@ func (n *Node) HandleMessageReceived() {
 	// Test a dead node
 	if n.Pid == 5 {
 		go func() {
-			time.Sleep(time.Second * 12)
+			time.Sleep(time.Second * 30)
 			defer close(n.RecvChannel)
 		}()
 	}
@@ -69,7 +71,7 @@ func (n *Node) HandleMessageReceived() {
 				}
 				if hashedValueINT < x {
 					// current_virtual_node := n.RingMap[x]
-					next_virtual_node := n.RingMap[n.Ring[(index+1)]]
+					next_virtual_node := n.VirtualNodeMap[n.Ring[(index+1)]]
 					string_list := strings.Split(next_virtual_node, "-")
 					next_pid, err = strconv.Atoi(string_list[0])
 					if err != nil {
@@ -91,12 +93,57 @@ func (n *Node) HandleMessageReceived() {
 		case "STRICT_CONSISTENCY":
 
 			//SendSignal for ack to owner node
+		case "BROADCAST_VIRTUAL_NODES":
+			location := msg.Payload["locationData"]
+			virtualNode := msg.Payload["virtualNodeData"]
+			n.VirtualNodeLocation = location.([]int)
+			n.VirtualNodeMap = virtualNode.(map[int]string)
 		}
 	}
 }
 
+// Create virtual nodes
+func (n *Node) CreateVirtualNodes(Pid int) error {
+	conf, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+
+	for i := 1; i <= conf.VirtualNodesCount; i++ {
+		virtualNode := strconv.Itoa(Pid) + "-" + strconv.Itoa(i)
+		location, e := config.GetHash(virtualNode)
+		if e != nil {
+			return e
+		}
+		fmt.Println("Virtual node ", virtualNode, "has started")
+		n.SendSignal(0, &data.Data{
+			From: Pid,
+			To:   0,
+			Payload: map[string]interface{}{
+				"type":            "UPDATE_VIRTUAL_NODE",
+				"virtualNodeData": virtualNode,
+				"locationData":    location,
+			},
+		})
+	}
+	return nil
+}
+
 // Start starts up a node, running receiving channel
-func (n *Node) Start() {
+func (n *Node) Start() error {
+	fmt.Printf("Node [%d] has started!\n", n.Pid)
+
+	// Create virtual node
+	err := n.CreateVirtualNodes(n.Pid)
+	if err != nil {
+		return err
+	}
+	go n.HandleMessageReceived()
+	return nil
+}
+
+// Start starts up a node, running receiving channel
+func (n *Node) StartDeadNode() {
 	fmt.Printf("Node [%d] has started!\n", n.Pid)
 	go n.HandleMessageReceived()
 }
