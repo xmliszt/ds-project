@@ -122,10 +122,13 @@ func (n *Node) TearDown() {
 func (n *Node) StartRouter() {
 	config, err := config.GetConfig()
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
-	n.Router.Start(fmt.Sprintf(":%d", config.Port))
+	err = n.Router.Start(fmt.Sprintf(":%d", config.Port))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Shutdown the router
