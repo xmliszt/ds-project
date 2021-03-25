@@ -73,12 +73,14 @@ func (locksmith *LockSmith) InitializeNodes(n int) {
 	for i := 1; i <= n; i++ {
 		nodeRecvChan := make(chan *data.Data, 1)
 		nodeSendChan := make(chan *data.Data, 1)
+		signalChan := make(chan error, 1)
 		isCoordinator := false
 		newNode := &rpc.Node{
 			IsCoordinator: &isCoordinator,
 			Pid:           i,
 			RecvChannel:   nodeRecvChan,
 			SendChannel:   nodeSendChan,
+			Signal:        signalChan,
 		}
 		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, i)
 		locksmith.Nodes[i] = newNode

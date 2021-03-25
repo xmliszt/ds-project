@@ -9,6 +9,7 @@ import (
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/data"
 	"github.com/xmliszt/e-safe/pkg/file"
+	"github.com/xmliszt/e-safe/pkg/secret"
 )
 
 // Node contains all the variables that are necessary to manage a node
@@ -22,6 +23,7 @@ type Node struct {
 	HeartBeatTable      map[int]bool            // Heartbeat table
 	VirtualNodeLocation []int
 	VirtualNodeMap      map[int]string
+	Signal              chan error
 }
 
 // HandleMessageReceived is a Go routine that handles the messages received
@@ -52,47 +54,62 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
-		case "STORE_DATA":
-			receivedPayload := msg.Payload["data"]                       // This should be the Secret
-			hashedValue := fmt.Sprintf("%v", msg.Payload["hashedValue"]) // This should be the hashed value omt for that secret
-			mapPayload := map[string]interface{}{
-				hashedValue: receivedPayload,
-			}
-			file.WriteDataFile(n.Pid, mapPayload)
-			// How are we going from n.Pid to next_id
-			// hashedValue -> current virtual node number (1-1)
-			// using Ring, current virtual node number -> next virtual node number
-			var next_pid int
-			for index, x := range n.Ring {
+		case "STORE_AND_REPLICATE":
+			n.StrictReplication(msg)
+			// receivedPayload := msg.Payload["data"]                       // This should be the Secret
+			// hashedValue := fmt.Sprintf("%v", msg.Payload["hashedValue"]) // This should be the hashed value omt for that secret
+			// mapPayload := map[string]interface{}{
+			// 	hashedValue: receivedPayload,
+			// }
+			// file.WriteDataFile(n.Pid, mapPayload)
+			// // How are we going from n.Pid to next_id
+			// // hashedValue -> current virtual node number (1-1)
+			// // using Ring, current virtual node number -> next virtual node number
+			// var next_pid int
+			// for index, x := range n.Ring {
 
-				hashedValueINT, err := strconv.Atoi(hashedValue)
-				if err != nil {
-					fmt.Println(err)
-				}
-				if hashedValueINT < x {
-					// current_virtual_node := n.RingMap[x]
-					next_virtual_node := n.VirtualNodeMap[n.Ring[(index+1)]]
-					string_list := strings.Split(next_virtual_node, "-")
-					next_pid, err = strconv.Atoi(string_list[0])
-					if err != nil {
-						fmt.Println(err)
-					}
-					break
+			// 	hashedValueINT, err := strconv.Atoi(hashedValue)
+			// 	if err != nil {
+			// 		fmt.Println(err)
+			// 	}
+			// 	if hashedValueINT < x {
+			// 		// current_virtual_node := n.RingMap[x]
+			// 		next_virtual_node := n.VirtualNodeMap[n.Ring[(index+1)]]
+			// 		string_list := strings.Split(next_virtual_node, "-")
+			// 		next_pid, err = strconv.Atoi(string_list[0])
+			// 		if err != nil {
+			// 			fmt.Println(err)
+			// 		}
+			// 		break
 
-				}
+			// 	}
 
-			}
-			n.SendSignal(next_pid, &data.Data{
-				From: n.Pid,
-				To:   next_pid,
-				Payload: map[string]interface{}{
-					"type": "STRICT_CONSISTENCY",
-					"data": mapPayload,
-				},
-			})
+			// }
+			// n.SendSignal(next_pid, &data.Data{
+			// 	From: n.Pid,
+			// 	To:   next_pid,
+			// 	Payload: map[string]interface{}{
+			// 		"type": "STRICT_CONSISTENCY",
+			// 		"data": mapPayload,
+			// 	},
+			// })
 		case "STRICT_CONSISTENCY":
+			n.StrictReplication(msg)
+		case "EVENTUAL_STORE":
+			n.EventualReplication(msg)
+		case "ACK_OWNER_NODE":
+			// TODO: need to send signal to coordinator
+			// Need to ask locksmith who is the coordinator
+		case "ACK_COORDINATOR":
+			n.Signal <- nil
+			// Reply to coordintor that write was successful
 
-			//SendSignal for ack to owner node
+		// Replication Factor Value -- (decrement)
+		// Secret to be stored
+		// Check if Replication Factor Value == 0. If yes, stop process - data successfully replicated.
+		// If not then send another EVEN_CONSISTENCY message to the next node
+
+		//SendSignal for ack to owner node
 		case "BROADCAST_VIRTUAL_NODES":
 			location := msg.Payload["locationData"]
 			virtualNode := msg.Payload["virtualNodeData"]
@@ -154,3 +171,307 @@ func (n *Node) TearDown() {
 	close(n.SendChannel)
 	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
 }
+
+// This is called by the coordinator node
+func (n *Node) PutSecret(alias string, value string, role int) error {
+	// Figure out which node to go to
+	aliasHash, e := config.GetHash(alias)
+	if e != nil {
+		fmt.Errorf("Hashing error")
+	}
+	stringifiedHash := fmt.Sprintf("%c", aliasHash)
+	nodePid, _ := n.mapHashToPid(aliasHash)
+	// Check if node is alive
+	nodeAlive := n.checkHeartbeat(nodePid)
+
+	// Prep secret struct
+	incomingSecret := secret.Secret{
+		Value: value,
+		Role:  role,
+	}
+
+	// Send replication signal
+	if nodeAlive {
+		n.SendSignal(nodePid, &data.Data{
+			From: n.Pid,
+			To:   nodePid,
+			Payload: map[string]interface{}{
+				"type":              "STORE_AND_REPLICATE",
+				"replicationFactor": 3, // TODO: need to write this in the config.go
+				"hashedValue":       stringifiedHash,
+				"data":              incomingSecret,
+			}})
+
+		// Wait for acknowledge from the owner node
+		err := <-n.Signal
+		return err
+	} else {
+		// return fmt.Errorf("Owner Node not alive")
+		fmt.Println("Owner Node not alive\nSending to subsequent node")
+		nextPid, _ := n.findNextPid(aliasHash)
+		n.SendSignal(nextPid, &data.Data{
+			From: n.Pid,
+			To:   nextPid,
+			Payload: map[string]interface{}{
+				"type":              "STRICT_REPLICATION", // Add to handleMessageReceived
+				"replicationFactor": 2,                    // TODO: need to write this in the config.go
+				"hashedValue":       aliasHash,
+				"data":              incomingSecret,
+			}})
+		err := <-n.Signal
+		return err
+	}
+
+}
+
+// This is called by the owner node
+func (n *Node) StartReplication(incomingData *data.Data) error {
+	// may got problem
+	key := incomingData.Payload["hashedValue"].(string)
+	secret := incomingData.Payload["data"]
+	secretToAdd := map[string]interface{}{
+		incomingData.Payload["hashedValue"].(string): incomingData.Payload["data"],
+	}
+	file.WriteDataFile(n.Pid, secretToAdd)
+	if n.HeartBeatTable[n.Pid+1] {
+
+	}
+
+	// next_node := n.Pid + 1
+	ukey, err := strconv.Atoi(key)
+	if err != nil {
+		return err
+	}
+	nextNode, nextVirtualNode := n.findNextPid(uint32(ukey))
+	// AndVirtualNodeId, virtual_node_name := n.mapHashToPid(uint32(next_node))
+	// Check if next node is alive
+	nodeAlive := n.checkHeartbeat(nextNode)
+	// Send replication signal
+	if nodeAlive {
+
+		n.SendSignal(nextNode, &data.Data{
+			From: n.Pid,
+			To:   nextNode,
+			Payload: map[string]interface{}{
+				"type":              "STRICT_CONSISTENCY",
+				"replicationFactor": 3,   // TODO: Take from config.go and minus 1
+				"hashedValue":       key, // This is the string of the hash
+				"data":              secret,
+			}})
+
+		// Wait for acknowledge from the neighbouring node
+		return nil
+	} else {
+		// return fmt.Errorf("Owner Node not alive")
+		fmt.Println("Subsequent Node not alive\nSending to the next node in sequence")
+		// TODO: Find the node next to the next node
+		nextNextNode, _ := n.findNextWithPid(nextVirtualNode)
+
+		n.SendSignal(nextNextNode, &data.Data{
+			From: n.Pid,
+			To:   nextNextNode,
+			Payload: map[string]interface{}{
+				"type":              "EVENTUAL_STORE", // Add to handleMessageReceived
+				"replicationFactor": 2,                // TODO: need to write this in the config.go
+				"hashedValue":       key,
+				"data":              secret,
+			},
+		})
+		return nil
+	}
+	// return nil
+
+}
+
+// this is called by the subsequent node
+func (n *Node) StrictReplication(incomingData *data.Data) error {
+	stringifiedHash := incomingData.Payload["hashedValue"].(string)
+	secret := incomingData.Payload["data"]
+	secretToAdd := map[string]interface{}{
+		incomingData.Payload["hashedValue"].(string): incomingData.Payload["data"],
+	}
+	err := file.WriteDataFile(n.Pid, secretToAdd)
+	if err != nil {
+		return err
+	} else {
+		// send ack to owner node
+		uIntHashValue, uIntConvertError := strconv.ParseUint(stringifiedHash, 32, 32)
+		if uIntConvertError != nil {
+			return uIntConvertError
+		}
+		ownerPid, _ := n.mapHashToPid(uint32(uIntHashValue))
+		_, nextVirtualNode := n.findNextPid(uint32(uIntHashValue))
+
+		n.SendSignal(ownerPid, &data.Data{
+			From: n.Pid,
+			To:   ownerPid,
+			Payload: map[string]interface{}{
+				"type": "ACK_OWNER_NODE",
+				"data": nil,
+			},
+		})
+
+		nextPid, nextNextVirtualNode := n.findNextWithPid(nextVirtualNode)
+		if n.checkHeartbeat(nextPid) {
+			n.SendSignal(nextPid, &data.Data{
+				From: n.Pid,
+				To:   nextPid,
+				Payload: map[string]interface{}{
+					"type":              "EVENTUAL_STORE",
+					"replicationFactor": 2,
+					"hashedValue":       stringifiedHash,
+					"data":              secret,
+				},
+			})
+		} else {
+			nextNextPid, _ := n.findNextWithPid(nextNextVirtualNode)
+			n.SendSignal(nextNextPid, &data.Data{
+				From: n.Pid,
+				To:   nextNextPid,
+				Payload: map[string]interface{}{
+					"type":              "EVENTUAL_STORE",
+					"replicationFactor": 1,
+					"hashedValue":       stringifiedHash,
+					"data":              secret,
+				},
+			})
+		}
+		return nil
+	}
+
+	// Ask the subsequent node to replicate
+}
+
+func (n *Node) EventualReplication(incomingData *data.Data) error {
+	// messageType := data.Payload["type"]
+	secret := incomingData.Payload["data"]
+	stringifiedHash := incomingData.Payload["hashedValue"].(string)
+	replicationFactor := incomingData.Payload["replicationFactor"].(int)
+	secretToAdd := map[string]interface{}{
+		incomingData.Payload["hashedValue"].(string): incomingData.Payload["data"],
+	}
+	err := file.WriteDataFile(n.Pid, secretToAdd)
+	if replicationFactor == 0 {
+		if err != nil {
+			return err
+		}
+	} else {
+		// send ack to owner node
+		uIntHashValue, uIntConvertError := strconv.ParseUint(stringifiedHash, 32, 32)
+		if uIntConvertError != nil {
+			return uIntConvertError
+		}
+		// ownerPid, _ := n.mapHashToPid(uint32(uIntHashValue))
+		_, nextVirtualNode := n.findNextPid(uint32(uIntHashValue))
+
+		nextPid, nextNextVirtualNode := n.findNextWithPid(nextVirtualNode)
+		if n.checkHeartbeat(nextPid) {
+			n.SendSignal(nextPid, &data.Data{
+				From: n.Pid,
+				To:   nextPid,
+				Payload: map[string]interface{}{
+					"type":              "EVENTUAL_STORE",
+					"replicationFactor": 2,
+					"hashedValue":       stringifiedHash,
+					"data":              secret,
+				},
+			})
+		} else {
+			nextNextPid, _ := n.findNextWithPid(nextNextVirtualNode)
+			n.SendSignal(nextNextPid, &data.Data{
+				From: n.Pid,
+				To:   nextNextPid,
+				Payload: map[string]interface{}{
+					"type":              "EVENTUAL_STORE",
+					"replicationFactor": 1,
+					"hashedValue":       stringifiedHash,
+					"data":              secret,
+				},
+			})
+		}
+		return nil
+	}
+	return nil
+}
+
+// Takes in virtual node pid to return next pid & virtual node name
+func (n *Node) findNextWithPid(virtualNodePid string) (int, string) {
+	var currentLocation uint32
+	var nextLocation uint32
+	var nextVirtualNodeName string
+	var next_pid int
+	var err error
+	for k, v := range n.VirtualNodeMap {
+		if v == virtualNodePid {
+			currentLocation = uint32(k)
+		}
+	}
+
+	for idx, location := range n.VirtualNodeLocation {
+		if location == int(currentLocation) {
+			nextLocation = uint32(n.VirtualNodeLocation[idx+1])
+		}
+	}
+	nextVirtualNodeName = n.VirtualNodeMap[int(nextLocation)]
+	string_list := strings.Split(nextVirtualNodeName, "-")
+	next_pid, err = strconv.Atoi(string_list[0])
+	if err != nil {
+		fmt.Println(err)
+	}
+	return next_pid, nextVirtualNodeName
+
+}
+
+// Takes in hasedValue to find the next node's pid and next node's virtual node name
+func (n *Node) findNextPid(hashedValue uint32) (int, string) {
+	var nextVirtualNode string
+	var nextPid int
+	var err error
+	for idx, location := range n.VirtualNodeLocation {
+		if int(hashedValue) < location {
+			// current_virtual_node := n.RingMap[x]
+			nextVirtualNode = n.VirtualNodeMap[n.Ring[(idx+1)]]
+			string_list := strings.Split(nextVirtualNode, "-")
+			nextPid, err = strconv.Atoi(string_list[0])
+			if err != nil {
+				fmt.Println(err)
+			}
+			break
+
+		}
+	}
+	return nextPid, nextVirtualNode
+}
+
+func (n *Node) checkHeartbeat(pid int) bool {
+	return n.HeartBeatTable[pid]
+
+}
+
+func (n *Node) mapHashToPid(hashedValue uint32) (int, string) {
+	// n := Node
+	var pid int
+	var err error
+	var virtual_node_name string
+	for location := range n.VirtualNodeLocation {
+
+		if int(hashedValue) < location {
+
+			virtual_node_name = n.VirtualNodeMap[location]
+			string_list := strings.Split(virtual_node_name, "-")
+			pid, err = strconv.Atoi(string_list[0])
+			if err != nil {
+				fmt.Println(err)
+			}
+			break
+		}
+		continue
+	}
+	return pid, virtual_node_name
+}
+
+// Replication function
+// Function to check if the subsequent nodes are alive
+// SendSignal to each of the subsequent nodes to replicate in them
+// Strict consistency on the first
+// And eventual on the rest

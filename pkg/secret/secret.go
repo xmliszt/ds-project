@@ -75,6 +75,26 @@ func GetSecrets(pid int, from int, to int) (map[string]*Secret, error) {
 
 // PutSecret place a specific secret within the respective data file
 func PutSecret(pid int, key string, secret Secret) error {
+	// Write to this node node first.
+	writeErr := writeSecret(pid, key, secret)
+	if writeErr != nil {
+		return nil
+	} else {
+		return writeErr
+	}
+
+	// Abstract this to another function
+	// secretVal := decodeSecret(secret)
+	// newSecret := map[string]interface{}{key: secretVal}
+	// fileError := file.WriteDataFile(pid, newSecret)
+	// if fileError != nil {
+	// 	return nil
+	// } else {
+	// 	return fileError
+	// }
+}
+
+func writeSecret(pid int, key string, secret Secret) error {
 	secretVal := decodeSecret(secret)
 	newSecret := map[string]interface{}{key: secretVal}
 	fileError := file.WriteDataFile(pid, newSecret)
