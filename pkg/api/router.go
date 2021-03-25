@@ -9,7 +9,7 @@ func GetRouter() *echo.Echo {
 	router := echo.New()
 
 	apiRouter := router.Group("/api/v1")
-	dashboardRouter := router.Group("/")
+	dashboardRouter := router.Group("/dashboard")
 
 	// Bind JWT token auth to sub-routers
 	apiRouter.Use(middleware.JWT([]byte("secret")))
@@ -17,7 +17,7 @@ func GetRouter() *echo.Echo {
 
 	// Views
 	router.GET("/", Home)
-	dashboardRouter.GET("/dashboard", Dashboard)
+	dashboardRouter.GET("", Dashboard)
 
 	// User
 	router.POST("/register", Register)

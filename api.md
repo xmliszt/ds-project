@@ -1,4 +1,4 @@
-# E-SAFE API Documentation
+# E-SAFE API Documentation (v1)
 
 [TOC]
 
@@ -77,7 +77,7 @@ Failure Response:
 
 ## Secret
 
-### /secret?alias={...} GET [Get a specific secret]
+### api/v1/secret?alias={...} GET [Get a specific secret]
 
 Request params:
 
@@ -112,7 +112,7 @@ Failure Response:
 }
 ```
 
-### /secret PUT [put a secret]
+### api/v1/secret PUT [put a secret]
 
 Request body:
 
@@ -151,7 +151,7 @@ Failure Response:
 }
 ```
 
-### /secret?alias={...} DELETE [Delete a secret]
+### api/v1/secret?alias={...} DELETE [Delete a secret]
 
 Request params:
 
@@ -180,7 +180,7 @@ Failure Response:
 }
 ```
 
-### /secrets GET [Get all secrets under this role]
+### api/v1/secrets GET [Get all secrets under this role]
 
 Success Response:
 
@@ -203,7 +203,6 @@ Success Response:
                 "role": 1
             }
     	],
-        "count": 2
     }
 }
 ```

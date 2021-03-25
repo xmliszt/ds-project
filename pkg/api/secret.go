@@ -25,7 +25,7 @@ func PutSecret(ctx echo.Context) error {
 	return ctx.String(http.StatusOK, fmt.Sprintf("Putting secret: %+v...", secret))
 }
 
-// Get a secret
+// Get a secret - deprecated
 func GetSecret(ctx echo.Context) error {
 	token := ctx.Get("user").(*jwt.Token)
 	claims := token.Claims.(jwt.MapClaims)
@@ -79,7 +79,7 @@ func DeleteSecret(ctx echo.Context) error {
 		})
 	}
 	// Handle delete a secret
-	err := secret.DeleteSecret(1, "126")
+	err := secret.DeleteSecret(1, "131")
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, &Response{
 			Success: false,
@@ -105,11 +105,14 @@ func GetAllSecrets(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, &Response{
 		Success: true,
 		Error:   "",
-		Data: []*secret.Secret{
-			{
-				Role:  2,
-				Value: "Sample secret",
-				Alias: "It is a sample secret",
+		Data: map[string]interface{}{
+			"role": role,
+			"data": []*secret.Secret{
+				{
+					Role:  2,
+					Value: "Sample secret",
+					Alias: "It is a sample secret",
+				},
 			},
 		},
 	})
