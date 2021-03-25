@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/data"
 	"github.com/xmliszt/e-safe/pkg/rpc"
 	"gopkg.in/go-playground/validator.v9"
@@ -71,6 +72,7 @@ func TestStartAllNodes(t *testing.T) {
 	locksmith.LockSmithNode.HeartBeatTable = make(map[int]bool)
 	iscoordinator := false
 	for i := 1; i <= 3; i++ {
+		router := api.GetRouter()
 		newNode := &rpc.Node{
 			Pid:           i,
 			IsCoordinator: &iscoordinator,
@@ -78,6 +80,7 @@ func TestStartAllNodes(t *testing.T) {
 			RpcMap: map[int]chan *data.Data{
 				0: locksmith.LockSmithNode.RecvChannel,
 			},
+			Router: router,
 		}
 		locksmith.Nodes[i] = newNode
 		locksmith.LockSmithNode.RpcMap[i] = newNode.RecvChannel
@@ -145,6 +148,7 @@ func TestElection(t *testing.T) {
 				Pid:           3,
 				IsCoordinator: &isCoordinator,
 				RecvChannel:   mockChan,
+				Router:        api.GetRouter(),
 			},
 		},
 	}
