@@ -1,7 +1,9 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -24,22 +26,15 @@ type Node struct {
 	Router              *echo.Echo
 }
 
-type NodeHandler interface {
-	Start()
-	TearDown()
-	HandlerMessageReceived()
-	HandleAPIRequests()
-}
-
 // HandleMessageReceived is a Go routine that handles the messages received
 func (n *Node) HandleMessageReceived() {
 
 	// Test a dead node
 	if n.Pid == 5 {
 		go func() {
-			time.Sleep(time.Second * 30)
-			defer close(n.RecvChannel)
-			// n.StopRouter()
+			time.Sleep(time.Second * 5)
+			close(n.RecvChannel)
+			n.StopRouter()
 		}()
 	}
 
@@ -60,7 +55,7 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
-			// n.StartRouter()
+			go n.StartRouter()
 		case "BROADCAST_VIRTUAL_NODES":
 			location := msg.Payload["locationData"]
 			virtualNode := msg.Payload["virtualNodeData"]
@@ -123,17 +118,20 @@ func (n *Node) TearDown() {
 	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
 }
 
-// // Starts the router
-// func (n *Node) StartRouter() {
-// 	config, err := config.GetConfig()
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-// 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
-// 	n.Router.Start(fmt.Sprintf(":%d", config.Port))
-// }
+// Starts the router
+func (n *Node) StartRouter() {
+	config, err := config.GetConfig()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Printf("Node %d listening to client's requests...\n", n.Pid)
+	n.Router.Start(fmt.Sprintf(":%d", config.Port))
+}
 
-// // Shutdown the router
-// func (n *Node) StopRouter() {
-// 	n.Router.Shutdown(context.TODO())
-// }
+// Shutdown the router
+func (n *Node) StopRouter() {
+	err := n.Router.Shutdown(context.TODO())
+	if err != nil {
+		panic(err)
+	}
+}

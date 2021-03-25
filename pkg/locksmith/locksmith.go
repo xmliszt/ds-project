@@ -71,8 +71,8 @@ func InitializeLocksmith() (*LockSmith, error) {
 
 // InitializeNodes initializes the number n nodes that Locksmith is going to create
 func (locksmith *LockSmith) InitializeNodes(n int) {
-	router := api.GetRouter()
 	for i := 1; i <= n; i++ {
+		router := api.GetRouter()
 		nodeRecvChan := make(chan *data.Data, 1)
 		nodeSendChan := make(chan *data.Data, 1)
 		isCoordinator := false
@@ -258,6 +258,7 @@ func (locksmith *LockSmith) Election() {
 
 // Spawn new nodes when a node is down
 func (locksmith *LockSmith) SpawnNewNode(n int) {
+	router := api.GetRouter()
 	nodeRecvChan := make(chan *data.Data, 1)
 	nodeSendChan := make(chan *data.Data, 1)
 	isCoordinator := false
@@ -266,6 +267,7 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 		Pid:           n,
 		RecvChannel:   nodeRecvChan,
 		SendChannel:   nodeSendChan,
+		Router:        router,
 	}
 
 	locksmith.Nodes[n] = newNode
