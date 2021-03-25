@@ -36,13 +36,6 @@ func TestInitializeNodes(t *testing.T) {
 	if len(locksmith.Nodes) < 3 || len(locksmith.LockSmithNode.Ring) < 3 || len(locksmith.LockSmithNode.RpcMap) < 3 {
 		t.Errorf("Expected 3 nodes to be created, but have incomplete creation: %d", len(locksmith.Nodes))
 	}
-	for _, node := range locksmith.Nodes {
-		validate := validator.New()
-		err := validate.Struct(node)
-		if err != nil {
-			t.Error(err)
-		}
-	}
 }
 
 // Expected HeartbeatTable to update to true when receive a heartbeat reply

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/xmliszt/e-safe/config"
+	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/data"
 	"github.com/xmliszt/e-safe/pkg/rpc"
 	"github.com/xmliszt/e-safe/util"
@@ -70,6 +71,7 @@ func InitializeLocksmith() (*LockSmith, error) {
 
 // InitializeNodes initializes the number n nodes that Locksmith is going to create
 func (locksmith *LockSmith) InitializeNodes(n int) {
+	router := api.GetRouter()
 	for i := 1; i <= n; i++ {
 		nodeRecvChan := make(chan *data.Data, 1)
 		nodeSendChan := make(chan *data.Data, 1)
@@ -80,6 +82,7 @@ func (locksmith *LockSmith) InitializeNodes(n int) {
 			RecvChannel:    nodeRecvChan,
 			SendChannel:    nodeSendChan,
 			HeartBeatTable: make(map[int]bool),
+			Router:         router,
 		}
 		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, i)
 		locksmith.Nodes[i] = newNode

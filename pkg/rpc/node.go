@@ -2,12 +2,11 @@ package rpc
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
-	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/data"
 )
 
@@ -19,9 +18,10 @@ type Node struct {
 	RecvChannel         chan *data.Data         `validate:"required"` // Receiving channel
 	SendChannel         chan *data.Data         `validate:"required"` // Sending channel
 	RpcMap              map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
-	HeartBeatTable      map[int]bool            // Heartbeat table
+	HeartBeatTable      map[int]bool
 	VirtualNodeLocation []int
 	VirtualNodeMap      map[int]string
+	Router              *echo.Echo
 }
 
 type NodeHandler interface {
@@ -39,6 +39,7 @@ func (n *Node) HandleMessageReceived() {
 		go func() {
 			time.Sleep(time.Second * 30)
 			defer close(n.RecvChannel)
+			// n.StopRouter()
 		}()
 	}
 
@@ -59,7 +60,7 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
-			go n.HandleAPIRequests()
+			// n.StartRouter()
 		case "BROADCAST_VIRTUAL_NODES":
 			location := msg.Payload["locationData"]
 			virtualNode := msg.Payload["virtualNodeData"]
@@ -122,15 +123,17 @@ func (n *Node) TearDown() {
 	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
 }
 
-// API Requests Handlers
-func (n *Node) HandleAPIRequests() {
-	config, err := config.GetConfig()
-	if err != nil {
-		log.Fatalln(err)
-	}
+// // Starts the router
+// func (n *Node) StartRouter() {
+// 	config, err := config.GetConfig()
+// 	if err != nil {
+// 		log.Fatalln(err)
+// 	}
+// 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
+// 	n.Router.Start(fmt.Sprintf(":%d", config.Port))
+// }
 
-	log.Printf("Node %d listening to client's requests...\n", n.Pid)
-	router := api.GetRouter()
-
-	router.Start(fmt.Sprintf(":%d", config.Port))
-}
+// // Shutdown the router
+// func (n *Node) StopRouter() {
+// 	n.Router.Shutdown(context.TODO())
+// }
