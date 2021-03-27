@@ -1,7 +1,7 @@
 package locksmith
 
 import (
-	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -31,20 +31,20 @@ func Start() error {
 	}
 	go locksmithServer.HandleMessageReceived() // Run this as the main go routine, so do not need to create separate go routine
 	locksmithServer.InitializeNodes(config.Number)
-	fmt.Println("Locksmith [0] has started")
-
-	// Simulate node failure
-	go func() {
-		targetNode := locksmithServer.Nodes[locksmithServer.Coordinator]
-		time.Sleep(time.Second * 20)
-		targetNode.TearDown()
-		targetNode.StopRouter()
-	}()
+	log.Println("Locksmith [0] has started")
 
 	e := locksmithServer.StartAllNodes()
 	if e != nil {
 		return e
 	}
+
+	// Simulate node failure
+	go func() {
+		targetNode := locksmithServer.Nodes[locksmithServer.Coordinator]
+		time.Sleep(time.Second * 20)
+		targetNode.StopRouter()
+		targetNode.TearDown()
+	}()
 
 	locksmithServer.CheckHeartbeat() // Start periodically checking Node's heartbeat
 
@@ -109,7 +109,7 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 		case "UPDATE_VIRTUAL_NODE":
 			location := int(msg.Payload["locationData"].(uint32))
 			virtualNode := msg.Payload["virtualNodeData"]
-			// fmt.Println("Locksmith has received from ", virtualNode.(string))
+			// log.Println("Locksmith has received from ", virtualNode.(string))
 			// Update its own values
 			locksmith.LockSmithNode.VirtualNodeLocation = append(locksmith.LockSmithNode.VirtualNodeLocation, location)
 			locksmith.LockSmithNode.VirtualNodeMap[location] = virtualNode.(string)
@@ -117,7 +117,7 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 			// Sort the location array
 			sort.Ints(locksmith.LockSmithNode.VirtualNodeLocation)
 
-			// fmt.Printf("---Map of virtual node's 'Location' : 'Virtual Node Id'---\n%v\n---Array of virtual node's location---\n%v\n", locksmith.LockSmithNode.VirtualNodeMap, locksmith.LockSmithNode.VirtualNodeLocation)
+			// log.Printf("---Map of virtual node's 'Location' : 'Virtual Node Id'---\n%v\n---Array of virtual node's location---\n%v\n", locksmith.LockSmithNode.VirtualNodeMap, locksmith.LockSmithNode.VirtualNodeLocation)
 			// Broadcast to other nodes
 			for _, pid := range locksmith.LockSmithNode.Ring {
 				locksmith.LockSmithNode.SendSignal(pid, &data.Data{
@@ -144,6 +144,7 @@ func (locksmith *LockSmith) StartAllNodes() error {
 		locksmith.LockSmithNode.HeartBeatTable[pid] = true
 	}
 	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
+	locksmith.Coordinator = coordinator
 	// Send message to node to turn coordinator field to true
 	locksmith.LockSmithNode.SendSignal(coordinator, &data.Data{
 		From: locksmith.LockSmithNode.Pid,
@@ -160,7 +161,7 @@ func (locksmith *LockSmith) StartAllNodes() error {
 func (locksmith *LockSmith) CheckHeartbeat() {
 	config, err := config.GetConfig()
 	if err != nil {
-		fmt.Println("Fatal: Heartbeat checking has crashed. Reason: ", err)
+		log.Println("Fatal: Heartbeat checking has crashed. Reason: ", err)
 		return
 	}
 	for {
@@ -178,13 +179,13 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						},
 					})
 					time.Sleep(time.Second * 1)
-					fmt.Println("Heartbeat Table: ", locksmith.LockSmithNode.HeartBeatTable)
+					log.Println("Heartbeat Table: ", locksmith.LockSmithNode.HeartBeatTable)
 					if !locksmith.LockSmithNode.HeartBeatTable[pid] {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.LockSmithNode.HeartBeatTable[pid] {
-							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
-							// fmt.Println("LOCKSMITH", locksmith.LockSmithNode.VirtualNodeMap)
-							// fmt.Println(locksmith.Nodes[pid].VirtualNodeMap)
+							log.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
+							// log.Println("LOCKSMITH", locksmith.LockSmithNode.VirtualNodeMap)
+							// log.Println(locksmith.Nodes[pid].VirtualNodeMap)
 							// Election process
 							if *locksmith.Nodes[pid].IsCoordinator {
 								locksmith.Election()
@@ -229,7 +230,7 @@ func (locksmith *LockSmith) DeadNodeChecker() {
 	for k, v := range locksmith.LockSmithNode.HeartBeatTable {
 		if !v {
 			locksmith.SpawnNewNode(k)
-			fmt.Printf("Node [%d] has been revived!\n", k)
+			log.Printf("Node [%d] has been revived!\n", k)
 		}
 	}
 }
@@ -257,7 +258,7 @@ func (locksmith *LockSmith) Election() {
 		},
 	})
 
-	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
+	log.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
 }
 
 // Spawn new nodes when a node is down
@@ -295,7 +296,7 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 // TearDown terminates node, closes all channels
 func (locksmith *LockSmith) TearDown() {
 	close(locksmith.LockSmithNode.RecvChannel)
-	fmt.Printf("Locksmith Server [%d] has terminated!\n", locksmith.LockSmithNode.Pid)
+	log.Printf("Locksmith Server [%d] has terminated!\n", locksmith.LockSmithNode.Pid)
 }
 
 // EndAllNodes starts teardown process of all created nodes

@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -68,7 +67,7 @@ func (n *Node) CreateVirtualNodes(Pid int) error {
 		if e != nil {
 			return e
 		}
-		fmt.Println("Virtual node ", virtualNode, "has started")
+		log.Println("Virtual node ", virtualNode, "has started")
 		n.SendSignal(0, &data.Data{
 			From: Pid,
 			To:   0,
@@ -84,7 +83,7 @@ func (n *Node) CreateVirtualNodes(Pid int) error {
 
 // Start starts up a node, running receiving channel
 func (n *Node) Start() error {
-	fmt.Printf("Node [%d] has started!\n", n.Pid)
+	log.Printf("Node [%d] has started!\n", n.Pid)
 
 	// Create virtual node
 	err := n.CreateVirtualNodes(n.Pid)
@@ -97,14 +96,15 @@ func (n *Node) Start() error {
 
 // Start starts up a node, running receiving channel
 func (n *Node) StartDeadNode() {
-	fmt.Printf("Node [%d] has started!\n", n.Pid)
+	log.Printf("Node [%d] has started!\n", n.Pid)
 	go n.HandleMessageReceived()
 }
 
 // TearDown terminates node, closes all channels
 func (n *Node) TearDown() {
+	log.Println(n.RecvChannel)
 	close(n.RecvChannel)
-	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
+	log.Printf("Node [%d] has terminated!\n", n.Pid)
 }
 
 // Starts the router
@@ -114,12 +114,17 @@ func (n *Node) StartRouter() {
 		panic(err)
 	}
 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
-	go n.Router.Start(fmt.Sprintf(":%d", config.Port))
+	go func() {
+		err := n.Router.Start(fmt.Sprintf(":%d", config.Port))
+		if err != nil {
+			log.Printf("Node %d REST server closed!\n", n.Pid)
+		}
+	}()
 }
 
 // Shutdown the router
 func (n *Node) StopRouter() {
-	err := n.Router.Shutdown(context.TODO())
+	err := n.Router.Close()
 	if err != nil {
 		panic(err)
 	}
