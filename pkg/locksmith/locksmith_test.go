@@ -96,6 +96,7 @@ func TestStartAllNodes(t *testing.T) {
 			t.Errorf("Expected Node [%d] to be alive, but yet it is not alive!", pid)
 		}
 	}
+	locksmith.Nodes[3].StopRouter()
 }
 
 // Expected length of Nodes to increase after spawning new node

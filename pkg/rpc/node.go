@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
@@ -18,7 +17,6 @@ type Node struct {
 	Pid                 int                     `validate:"gte=0"`    // Node ID
 	Ring                []int                   `validate:"required"` // Ring structure of nodes
 	RecvChannel         chan *data.Data         `validate:"required"` // Receiving channel
-	SendChannel         chan *data.Data         `validate:"required"` // Sending channel
 	RpcMap              map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
 	HeartBeatTable      map[int]bool
 	VirtualNodeLocation []int
@@ -28,15 +26,6 @@ type Node struct {
 
 // HandleMessageReceived is a Go routine that handles the messages received
 func (n *Node) HandleMessageReceived() {
-
-	// Test a dead node
-	if n.Pid == 5 {
-		go func() {
-			time.Sleep(time.Second * 5)
-			close(n.RecvChannel)
-			n.StopRouter()
-		}()
-	}
 
 	for msg := range n.RecvChannel {
 		switch msg.Payload["type"] {
@@ -55,7 +44,8 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
-			go n.StartRouter()
+			log.Printf("Node %d is the coordinator now!\n", n.Pid)
+			n.StartRouter()
 		case "BROADCAST_VIRTUAL_NODES":
 			location := msg.Payload["locationData"]
 			virtualNode := msg.Payload["virtualNodeData"]
@@ -114,7 +104,6 @@ func (n *Node) StartDeadNode() {
 // TearDown terminates node, closes all channels
 func (n *Node) TearDown() {
 	close(n.RecvChannel)
-	close(n.SendChannel)
 	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
 }
 
@@ -125,10 +114,7 @@ func (n *Node) StartRouter() {
 		panic(err)
 	}
 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
-	err = n.Router.Start(fmt.Sprintf(":%d", config.Port))
-	if err != nil {
-		panic(err)
-	}
+	go n.Router.Start(fmt.Sprintf(":%d", config.Port))
 }
 
 // Shutdown the router

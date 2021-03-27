@@ -5,8 +5,15 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+type RouterBuilder struct{}
+
+func (rb *RouterBuilder) New() *echo.Echo {
+	return echo.New()
+}
+
 func GetRouter() *echo.Echo {
-	router := echo.New()
+	routerBuilder := &RouterBuilder{}
+	router := routerBuilder.New()
 
 	apiRouter := router.Group("/api/v1")
 	dashboardRouter := router.Group("/dashboard")

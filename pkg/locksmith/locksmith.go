@@ -32,6 +32,15 @@ func Start() error {
 	go locksmithServer.HandleMessageReceived() // Run this as the main go routine, so do not need to create separate go routine
 	locksmithServer.InitializeNodes(config.Number)
 	fmt.Println("Locksmith [0] has started")
+
+	// Simulate node failure
+	go func() {
+		targetNode := locksmithServer.Nodes[locksmithServer.Coordinator]
+		time.Sleep(time.Second * 20)
+		targetNode.TearDown()
+		targetNode.StopRouter()
+	}()
+
 	e := locksmithServer.StartAllNodes()
 	if e != nil {
 		return e
@@ -49,14 +58,12 @@ func InitializeLocksmith() (*LockSmith, error) {
 		return nil, err
 	}
 	receivingChannel := make(chan *data.Data, config.Number*config.VirtualNodesCount)
-	sendingChannel := make(chan *data.Data, config.Number*config.VirtualNodesCount)
 	isCoordinator := false
 	locksmithServer := &LockSmith{
 		LockSmithNode: &rpc.Node{
 			IsCoordinator:       &isCoordinator,
 			Pid:                 0,
 			RecvChannel:         receivingChannel,
-			SendChannel:         sendingChannel,
 			Ring:                make([]int, 0),
 			RpcMap:              make(map[int]chan *data.Data),
 			VirtualNodeLocation: make([]int, 0),
@@ -74,13 +81,11 @@ func (locksmith *LockSmith) InitializeNodes(n int) {
 	for i := 1; i <= n; i++ {
 		router := api.GetRouter()
 		nodeRecvChan := make(chan *data.Data, 1)
-		nodeSendChan := make(chan *data.Data, 1)
 		isCoordinator := false
 		newNode := &rpc.Node{
 			IsCoordinator:  &isCoordinator,
 			Pid:            i,
 			RecvChannel:    nodeRecvChan,
-			SendChannel:    nodeSendChan,
 			HeartBeatTable: make(map[int]bool),
 			Router:         router,
 		}
@@ -104,16 +109,15 @@ func (locksmith *LockSmith) HandleMessageReceived() {
 		case "UPDATE_VIRTUAL_NODE":
 			location := int(msg.Payload["locationData"].(uint32))
 			virtualNode := msg.Payload["virtualNodeData"]
-			fmt.Println("Locksmith has received from ", virtualNode.(string))
+			// fmt.Println("Locksmith has received from ", virtualNode.(string))
 			// Update its own values
 			locksmith.LockSmithNode.VirtualNodeLocation = append(locksmith.LockSmithNode.VirtualNodeLocation, location)
-			locksmith.LockSmithNode.VirtualNodeMap[location] =
-				virtualNode.(string)
+			locksmith.LockSmithNode.VirtualNodeMap[location] = virtualNode.(string)
 
 			// Sort the location array
 			sort.Ints(locksmith.LockSmithNode.VirtualNodeLocation)
 
-			fmt.Printf("---Map of virtual node's 'Location' : 'Virtual Node Id'---\n%v\n---Array of virtual node's location---\n%v\n", locksmith.LockSmithNode.VirtualNodeMap, locksmith.LockSmithNode.VirtualNodeLocation)
+			// fmt.Printf("---Map of virtual node's 'Location' : 'Virtual Node Id'---\n%v\n---Array of virtual node's location---\n%v\n", locksmith.LockSmithNode.VirtualNodeMap, locksmith.LockSmithNode.VirtualNodeLocation)
 			// Broadcast to other nodes
 			for _, pid := range locksmith.LockSmithNode.Ring {
 				locksmith.LockSmithNode.SendSignal(pid, &data.Data{
@@ -179,8 +183,8 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.LockSmithNode.HeartBeatTable[pid] {
 							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
-							fmt.Println("LOCKSMITH", locksmith.LockSmithNode.VirtualNodeMap)
-							fmt.Println(locksmith.Nodes[pid].VirtualNodeMap)
+							// fmt.Println("LOCKSMITH", locksmith.LockSmithNode.VirtualNodeMap)
+							// fmt.Println(locksmith.Nodes[pid].VirtualNodeMap)
 							// Election process
 							if *locksmith.Nodes[pid].IsCoordinator {
 								locksmith.Election()
@@ -260,13 +264,11 @@ func (locksmith *LockSmith) Election() {
 func (locksmith *LockSmith) SpawnNewNode(n int) {
 	router := api.GetRouter()
 	nodeRecvChan := make(chan *data.Data, 1)
-	nodeSendChan := make(chan *data.Data, 1)
 	isCoordinator := false
 	newNode := &rpc.Node{
 		IsCoordinator: &isCoordinator,
 		Pid:           n,
 		RecvChannel:   nodeRecvChan,
-		SendChannel:   nodeSendChan,
 		Router:        router,
 	}
 
@@ -293,7 +295,6 @@ func (locksmith *LockSmith) SpawnNewNode(n int) {
 // TearDown terminates node, closes all channels
 func (locksmith *LockSmith) TearDown() {
 	close(locksmith.LockSmithNode.RecvChannel)
-	close(locksmith.LockSmithNode.SendChannel)
 	fmt.Printf("Locksmith Server [%d] has terminated!\n", locksmith.LockSmithNode.Pid)
 }
 
