@@ -54,8 +54,10 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
+		// Secret sent to node that it is hased to
 		case "STORE_AND_REPLICATE":
-			n.StrictReplication(msg)
+			// Store the data to the main node. Check if the neighbouring node is alive. If not then send to the next node.
+			n.StartReplication(msg)
 			// receivedPayload := msg.Payload["data"]                       // This should be the Secret
 			// hashedValue := fmt.Sprintf("%v", msg.Payload["hashedValue"]) // This should be the hashed value omt for that secret
 			// mapPayload := map[string]interface{}{
@@ -93,13 +95,19 @@ func (n *Node) HandleMessageReceived() {
 			// 		"data": mapPayload,
 			// 	},
 			// })
+		// Sent by the owner node to the neighbouring node
 		case "STRICT_CONSISTENCY":
+			// Replicate secret into the node and then call for eventual consistency in the next R-1 nodes
 			n.StrictReplication(msg)
+		// Sent by the neighbouring node to the next R-1 nodes
 		case "EVENTUAL_STORE":
 			n.EventualReplication(msg)
+		// Sent by the neighbouring node to the owner node
 		case "ACK_OWNER_NODE":
 			// TODO: need to send signal to coordinator
+			n.ackCoordinator(msg)
 			// Need to ask locksmith who is the coordinator
+		// Sent by the owner node to the coordinator
 		case "ACK_COORDINATOR":
 			n.Signal <- nil
 			// Reply to coordintor that write was successful
@@ -225,6 +233,7 @@ func (n *Node) PutSecret(alias string, value string, role int) error {
 }
 
 // This is called by the owner node
+// It stores the secret & begins the replication process
 func (n *Node) StartReplication(incomingData *data.Data) error {
 	// may got problem
 	key := incomingData.Payload["hashedValue"].(string)
@@ -233,9 +242,6 @@ func (n *Node) StartReplication(incomingData *data.Data) error {
 		incomingData.Payload["hashedValue"].(string): incomingData.Payload["data"],
 	}
 	file.WriteDataFile(n.Pid, secretToAdd)
-	if n.HeartBeatTable[n.Pid+1] {
-
-	}
 
 	// next_node := n.Pid + 1
 	ukey, err := strconv.Atoi(key)
@@ -271,8 +277,8 @@ func (n *Node) StartReplication(incomingData *data.Data) error {
 			From: n.Pid,
 			To:   nextNextNode,
 			Payload: map[string]interface{}{
-				"type":              "EVENTUAL_STORE", // Add to handleMessageReceived
-				"replicationFactor": 2,                // TODO: need to write this in the config.go
+				"type":              "STRICT_CONSISTENCY", // Add to handleMessageReceived
+				"replicationFactor": 2,                    // TODO: need to write this in the config.go
 				"hashedValue":       key,
 				"data":              secret,
 			},
@@ -294,7 +300,6 @@ func (n *Node) StrictReplication(incomingData *data.Data) error {
 	if err != nil {
 		return err
 	} else {
-		// send ack to owner node
 		uIntHashValue, uIntConvertError := strconv.ParseUint(stringifiedHash, 32, 32)
 		if uIntConvertError != nil {
 			return uIntConvertError
@@ -302,6 +307,7 @@ func (n *Node) StrictReplication(incomingData *data.Data) error {
 		ownerPid, _ := n.mapHashToPid(uint32(uIntHashValue))
 		_, nextVirtualNode := n.findNextPid(uint32(uIntHashValue))
 
+		// ack to owner node
 		n.SendSignal(ownerPid, &data.Data{
 			From: n.Pid,
 			To:   ownerPid,
@@ -310,38 +316,58 @@ func (n *Node) StrictReplication(incomingData *data.Data) error {
 				"data": nil,
 			},
 		})
-
-		nextPid, nextNextVirtualNode := n.findNextWithPid(nextVirtualNode)
-		if n.checkHeartbeat(nextPid) {
-			n.SendSignal(nextPid, &data.Data{
-				From: n.Pid,
-				To:   nextPid,
-				Payload: map[string]interface{}{
-					"type":              "EVENTUAL_STORE",
-					"replicationFactor": 2,
-					"hashedValue":       stringifiedHash,
-					"data":              secret,
-				},
-			})
-		} else {
-			nextNextPid, _ := n.findNextWithPid(nextNextVirtualNode)
-			n.SendSignal(nextNextPid, &data.Data{
-				From: n.Pid,
-				To:   nextNextPid,
-				Payload: map[string]interface{}{
-					"type":              "EVENTUAL_STORE",
-					"replicationFactor": 1,
-					"hashedValue":       stringifiedHash,
-					"data":              secret,
-				},
-			})
+		//  whether the replication factor is 2 or 3
+		replication_fac := incomingData.Payload["replicationFactor"].(int)
+		if replication_fac == 2 {
+			nextPid, _ := n.findNextWithPid(nextVirtualNode)
+			//  check whetehr next node alive
+			if n.checkHeartbeat(nextPid) {
+				n.SendSignal(nextPid, &data.Data{
+					From: n.Pid,
+					To:   nextPid,
+					Payload: map[string]interface{}{
+						"type":              "EVENTUAL_STORE",
+						"replicationFactor": 1,
+						"hashedValue":       stringifiedHash,
+						"data":              secret,
+					},
+				})
+			}
+		} else if replication_fac == 3 {
+			nextPid, nextNextVirtualNode := n.findNextWithPid(nextVirtualNode)
+			if n.checkHeartbeat(nextPid) {
+				n.SendSignal(nextPid, &data.Data{
+					From: n.Pid,
+					To:   nextPid,
+					Payload: map[string]interface{}{
+						"type":              "EVENTUAL_STORE",
+						"replicationFactor": 2,
+						"hashedValue":       stringifiedHash,
+						"data":              secret,
+					},
+				})
+			} else {
+				nextNextPid, _ := n.findNextWithPid(nextNextVirtualNode)
+				n.SendSignal(nextNextPid, &data.Data{
+					From: n.Pid,
+					To:   nextNextPid,
+					Payload: map[string]interface{}{
+						"type":              "EVENTUAL_STORE",
+						"replicationFactor": 1,
+						"hashedValue":       stringifiedHash,
+						"data":              secret,
+					},
+				})
+			}
 		}
+
 		return nil
 	}
 
 	// Ask the subsequent node to replicate
 }
 
+//  EventualReplication is called by the nodes that will not ACK back to the owner
 func (n *Node) EventualReplication(incomingData *data.Data) error {
 	// messageType := data.Payload["type"]
 	secret := incomingData.Payload["data"]
@@ -351,12 +377,11 @@ func (n *Node) EventualReplication(incomingData *data.Data) error {
 		incomingData.Payload["hashedValue"].(string): incomingData.Payload["data"],
 	}
 	err := file.WriteDataFile(n.Pid, secretToAdd)
-	if replicationFactor == 0 {
+	if replicationFactor == 1 {
 		if err != nil {
 			return err
 		}
 	} else {
-		// send ack to owner node
 		uIntHashValue, uIntConvertError := strconv.ParseUint(stringifiedHash, 32, 32)
 		if uIntConvertError != nil {
 			return uIntConvertError
@@ -364,31 +389,34 @@ func (n *Node) EventualReplication(incomingData *data.Data) error {
 		// ownerPid, _ := n.mapHashToPid(uint32(uIntHashValue))
 		_, nextVirtualNode := n.findNextPid(uint32(uIntHashValue))
 
-		nextPid, nextNextVirtualNode := n.findNextWithPid(nextVirtualNode)
-		if n.checkHeartbeat(nextPid) {
+		nextPid, _ := n.findNextWithPid(nextVirtualNode)
+		// nextPid, nextNextVirtualNode := n.findNextWithPid(nextVirtualNode)
+		var currentRepFacor = incomingData.Payload["replicationFactor"]
+		if n.checkHeartbeat(nextPid) && currentRepFacor == 2 {
 			n.SendSignal(nextPid, &data.Data{
 				From: n.Pid,
 				To:   nextPid,
 				Payload: map[string]interface{}{
 					"type":              "EVENTUAL_STORE",
-					"replicationFactor": 2,
-					"hashedValue":       stringifiedHash,
-					"data":              secret,
-				},
-			})
-		} else {
-			nextNextPid, _ := n.findNextWithPid(nextNextVirtualNode)
-			n.SendSignal(nextNextPid, &data.Data{
-				From: n.Pid,
-				To:   nextNextPid,
-				Payload: map[string]interface{}{
-					"type":              "EVENTUAL_STORE",
-					"replicationFactor": 1,
+					"replicationFactor": 1, // TODO: Need to implement R-2 from config.go
 					"hashedValue":       stringifiedHash,
 					"data":              secret,
 				},
 			})
 		}
+		// else {
+		// 	nextNextPid, _ := n.findNextWithPid(nextNextVirtualNode)
+		// 	n.SendSignal(nextNextPid, &data.Data{
+		// 		From: n.Pid,
+		// 		To:   nextNextPid,
+		// 		Payload: map[string]interface{}{
+		// 			"type":              "EVENTUAL_STORE",
+		// 			"replicationFactor": 1,
+		// 			"hashedValue":       stringifiedHash,
+		// 			"data":              secret,
+		// 		},
+		// 	})
+		// }
 		return nil
 	}
 	return nil
@@ -468,6 +496,20 @@ func (n *Node) mapHashToPid(hashedValue uint32) (int, string) {
 		continue
 	}
 	return pid, virtual_node_name
+}
+
+func (n *Node) ackCoordinator(incomingData *data.Data) error {
+	// ack to owner node
+	// owner id is the coordinator id
+	n.SendSignal(coordinatorPid, &data.Data{
+		From: n.Pid,
+		To:   coordinatorPid,
+		Payload: map[string]interface{}{
+			"type": "ACK_COORDINATOR",
+			"data": nil,
+		},
+	})
+	return nil
 }
 
 // Replication function
