@@ -97,6 +97,17 @@ func (locksmith *LockSmith) InitializeNodes(n int) {
 func (locksmith *LockSmith) HandleMessageReceived() {
 	for msg := range locksmith.LockSmithNode.RecvChannel {
 		switch msg.Payload["type"] {
+		// after node replica, node need to ack coordinator, then it need to ask the locksmith for the coordinator ID
+		case "ASK_COORDINATOR":
+			locksmith.LockSmithNode.SendSignal(msg.From, &data.Data{
+				From: locksmith.LockSmithNode.Pid,
+				To:   msg.From,
+				Payload: map[string]interface{}{
+					"type":          "REPLY_COORDINATOR",
+					"coordinatorID": locksmith.Coordinator,
+				},
+			})
+
 		case "REPLY_HEARTBEAT":
 			locksmith.LockSmithNode.HeartBeatTable[msg.From] = true
 		case "UPDATE_VIRTUAL_NODE":

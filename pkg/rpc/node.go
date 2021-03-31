@@ -105,9 +105,18 @@ func (n *Node) HandleMessageReceived() {
 		// Sent by the neighbouring node to the owner node
 		case "ACK_OWNER_NODE":
 			// TODO: need to send signal to coordinator
-			n.ackCoordinator(msg)
+			n.SendSignal(0, &data.Data{
+				From: n.Pid,
+				To:   0,
+				Payload: map[string]interface{}{
+					"type": "ASK_COORDINATOR",
+					"data": nil,
+				},
+			})
 			// Need to ask locksmith who is the coordinator
-		// Sent by the owner node to the coordinator
+			// Sent by the owner node to the coordinator
+		case "REPLY_COORDINATOR":
+			n.ackCoordinator(msg)
 		case "ACK_COORDINATOR":
 			n.Signal <- nil
 			// Reply to coordintor that write was successful
@@ -501,9 +510,10 @@ func (n *Node) mapHashToPid(hashedValue uint32) (int, string) {
 func (n *Node) ackCoordinator(incomingData *data.Data) error {
 	// ack to owner node
 	// owner id is the coordinator id
-	n.SendSignal(coordinatorPid, &data.Data{
+	coordinatorID := incomingData.Payload["coordinatorID"].(int)
+	n.SendSignal(coordinatorID, &data.Data{
 		From: n.Pid,
-		To:   coordinatorPid,
+		To:   coordinatorID,
 		Payload: map[string]interface{}{
 			"type": "ACK_COORDINATOR",
 			"data": nil,
