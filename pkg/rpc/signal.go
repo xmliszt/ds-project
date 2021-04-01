@@ -15,7 +15,7 @@ func (n *Node) SendSignal(pid int, data *data.Data) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			log.Println("Signal recovery: ", r)
+			log.Printf("Node %d is unable to send to node %d: %s\n", n.Pid, pid, r)
 		}
 	}()
 	// fmt.Printf("[%d] -> [%d]: %v\n", n.Pid, pid, data)

@@ -102,7 +102,6 @@ func (n *Node) StartDeadNode() {
 
 // TearDown terminates node, closes all channels
 func (n *Node) TearDown() {
-	log.Println(n.RecvChannel)
 	close(n.RecvChannel)
 	log.Printf("Node [%d] has terminated!\n", n.Pid)
 }
