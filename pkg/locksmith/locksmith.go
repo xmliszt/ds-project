@@ -179,7 +179,7 @@ func (locksmith *LockSmith) CheckHeartbeat() {
 						},
 					})
 					time.Sleep(time.Second * 1)
-					log.Println("Heartbeat Table: ", locksmith.LockSmithNode.HeartBeatTable)
+					// log.Println("Heartbeat Table: ", locksmith.LockSmithNode.HeartBeatTable)
 					if !locksmith.LockSmithNode.HeartBeatTable[pid] {
 						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
 						if !locksmith.LockSmithNode.HeartBeatTable[pid] {
