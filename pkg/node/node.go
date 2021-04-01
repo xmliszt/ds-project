@@ -8,7 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
-	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/pkg/api"
 )
 
 // Node contains all the variables that are necessary to manage a node
@@ -40,6 +40,8 @@ func Start(nodeID int) {
 		log.Fatal(err)
 	}
 
+	routerBuilder := &api.RouterBuilder{}
+
 	node := &Node{
 		IsCoordinator:       false,
 		Pid:                 nodeID,
@@ -48,9 +50,8 @@ func Start(nodeID int) {
 		VirtualNodeLocation: make([]int, 0),
 		VirtualNodeMap:      make(map[int]string),
 		HeartBeatTable:      make(map[int]bool),
+		Router:              routerBuilder.New(),
 	}
-
-	node.HeartBeatTable = GetHeartbeatTable(node.Pid)
 
 	// Start RPC server
 	log.Printf("Node %d listening on: %v\n", node.Pid, address)
@@ -58,50 +59,11 @@ func Start(nodeID int) {
 	rpc.Accept(inbound)
 }
 
-// GetHeartbeatTable sends RPC call to Locksmith and retrieve the heartbeat table
-func GetHeartbeatTable(From int) map[int]bool {
-	config, err := config.GetConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-	client, err := rpc.Dial("tcp", fmt.Sprintf("localhost:%d", config.ConfigLocksmith.Port))
-	if err != nil {
-		log.Fatal(err)
-	}
-	request := &message.Request{
-		From:    From,
-		To:      0,
-		Code:    message.GET_HEARTBEAT_TABLE,
-		Payload: nil,
-	}
-	var reply message.Reply
-	err = client.Call("LockSmith.GetHeartbeatTable", request, &reply)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		client.Close()
-	}()
-	return reply.Payload.(map[int]bool)
-}
-
 // // HandleMessageReceived is a Go routine that handles the messages received
 // func (n *Node) HandleMessageReceived() {
 
 // 	for msg := range n.RecvChannel {
 // 		switch msg.Payload["type"] {
-// 		case "CHECK_HEARTBEAT":
-// 			n.SendSignal(0, &data.Data{
-// 				From: n.Pid,
-// 				To:   0,
-// 				Payload: map[string]interface{}{
-// 					"type": "REPLY_HEARTBEAT",
-// 					"data": nil,
-// 				},
-// 			})
-// 		case "UPDATE_HEARTBEAT":
-// 			heartbeatTable := msg.Payload["data"]
-// 			n.HeartBeatTable = heartbeatTable.(map[int]bool)
 // 		case "YOU_ARE_COORDINATOR":
 // 			isCoordinator := true
 // 			n.IsCoordinator = &isCoordinator
@@ -156,36 +118,25 @@ func GetHeartbeatTable(From int) map[int]bool {
 // 	return nil
 // }
 
-// // Start starts up a node, running receiving channel
-// func (n *Node) StartDeadNode() {
-// 	log.Printf("Node [%d] has started!\n", n.Pid)
-// 	go n.HandleMessageReceived()
-// }
+// Starts the router
+func (n *Node) startRouter() {
+	config, err := config.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("Node %d listening to client's requests...\n", n.Pid)
+	go func() {
+		err := n.Router.Start(fmt.Sprintf(":%d", config.ConfigServer.Port))
+		if err != nil {
+			log.Printf("Node %d REST server closed!\n", n.Pid)
+		}
+	}()
+}
 
-// // TearDown terminates node, closes all channels
-// func (n *Node) TearDown() {
-// 	log.Printf("Node [%d] has terminated!\n", n.Pid)
-// }
-
-// // Starts the router
-// func (n *Node) StartRouter() {
-// 	config, err := config.GetConfig()
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
-// 	go func() {
-// 		err := n.Router.Start(fmt.Sprintf(":%d", config.Port))
-// 		if err != nil {
-// 			log.Printf("Node %d REST server closed!\n", n.Pid)
-// 		}
-// 	}()
-// }
-
-// // Shutdown the router
-// func (n *Node) StopRouter() {
-// 	err := n.Router.Close()
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// }
+// Shutdown the router
+func (n *Node) stopRouter() {
+	err := n.Router.Close()
+	if err != nil {
+		panic(err)
+	}
+}

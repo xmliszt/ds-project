@@ -1,8 +1,13 @@
 package message
 
+import (
+	"net/rpc"
+)
+
 const (
 	UPDATE_HEARTBEAT_TABLE = 0
 	GET_HEARTBEAT_TABLE    = 1
+	ASSIGN_COORDINATOR     = 2
 )
 
 type Reply struct {
@@ -17,4 +22,19 @@ type Request struct {
 	To      int         // Node ID of which the request is sent to
 	Code    int         // The requested RPC code
 	Payload interface{} // The content of the request
+}
+
+// SendMessage delivers an RPC message to target address, with given method to call and parameters
+func SendMessage(address string, method string, request *Request, reply *Reply) error {
+	client, err := rpc.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+	err = client.Call(method, request, reply)
+	if err != nil {
+		client.Close()
+		return err
+	}
+	client.Close()
+	return nil
 }
