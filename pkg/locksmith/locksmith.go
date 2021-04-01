@@ -108,10 +108,7 @@ func (locksmith *LockSmith) broadcastHeartbeatTable(excludeNodeID interface{}) {
 			Payload: locksmith.HeartBeatTable,
 		}
 		var reply message.Reply
-		err := message.SendMessage(address, "Node.UpdateHeartbeatTable", request, &reply)
-		if err != nil {
-			log.Fatal(err)
-		}
+		message.SendMessage(address, "Node.UpdateHeartbeatTable", request, &reply)
 	}
 }
 
@@ -123,13 +120,13 @@ func (locksmith *LockSmith) monitorCoordinatorStatus() {
 	}
 	for {
 		time.Sleep(time.Second * time.Duration(config.CoordinatorMonitorInterval))
-		newCoordinatorID := locksmith.Coordinator
+		newCoordinatorID := 0
 		for pid, alive := range locksmith.HeartBeatTable {
-			if alive && pid > locksmith.Coordinator {
+			if alive && pid > newCoordinatorID {
 				newCoordinatorID = pid
 			}
 		}
-		if newCoordinatorID != locksmith.Coordinator {
+		if newCoordinatorID != locksmith.Coordinator && newCoordinatorID > 0 {
 			locksmith.assignCoordinator(newCoordinatorID)
 		}
 	}
@@ -141,7 +138,7 @@ func (locksmith *LockSmith) assignCoordinator(pid int) {
 	var request *message.Request
 
 	// Remove the old coordinator
-	if locksmith.Coordinator > 0 {
+	if locksmith.Coordinator > 0 && locksmith.HeartBeatTable[locksmith.Coordinator] {
 		request = &message.Request{
 			From:    locksmith.Pid,
 			To:      pid,
