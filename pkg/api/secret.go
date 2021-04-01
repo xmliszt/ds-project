@@ -11,6 +11,13 @@ import (
 	"github.com/xmliszt/e-safe/pkg/user"
 )
 
+type SecretHandler interface {
+	PutSecret(ctx echo.Context) error
+	GetSecret(ctx echo.Context) error
+	DeleteSecret(ctx echo.Context) error
+	GetAllSecrets(ctx echo.Context) error
+}
+
 // Put a secret
 func PutSecret(ctx echo.Context) error {
 	secret := new(secret.Secret)
@@ -79,7 +86,6 @@ func DeleteSecret(ctx echo.Context) error {
 		})
 	}
 	// Handle delete a secret
-	err := secret.DeleteSecret(1, "131")
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, &Response{
 			Success: false,
