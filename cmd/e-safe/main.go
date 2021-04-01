@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/locksmith"
 	"github.com/xmliszt/e-safe/pkg/node"
 	"github.com/xmliszt/e-safe/pkg/register"
@@ -23,18 +22,13 @@ func main() {
 		log.Fatalln("Only support role: [node, locksmith]!")
 	}
 
-	config, err := config.GetConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	switch role {
 	case "node":
 		var nodeID int
-		fmt.Printf("Enter Node ID to start (1 ~ %d): ", config.ConfigNode.Number)
+		fmt.Print("Enter Node ID to start (>=1): ")
 		fmt.Scan(&nodeID)
-		if nodeID < 1 || nodeID > config.ConfigNode.Number {
-			log.Fatalln("If you want to add more nodes, please change the node number in config.yaml!")
+		if nodeID < 1 {
+			log.Fatalln("Node number must be larger than 0!")
 		}
 		log.Printf("Node %d start!\n", nodeID)
 		node.Start(nodeID)

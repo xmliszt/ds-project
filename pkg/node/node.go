@@ -5,10 +5,13 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/api"
+	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/util"
 )
 
 // Node contains all the variables that are necessary to manage a node
@@ -45,12 +48,20 @@ func Start(nodeID int) {
 	node := &Node{
 		IsCoordinator:       false,
 		Pid:                 nodeID,
-		Ring:                make([]int, 0),
 		RpcMap:              make(map[int]string),
 		VirtualNodeLocation: make([]int, 0),
 		VirtualNodeMap:      make(map[int]string),
 		HeartBeatTable:      make(map[int]bool),
 		Router:              routerBuilder.New(),
+	}
+
+	err = node.signalNodeStart() // Send start signal to Locksmith
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = node.createVirtualNodes() // Create virtual nodes
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// Start RPC server
@@ -59,70 +70,112 @@ func Start(nodeID int) {
 	rpc.Accept(inbound)
 }
 
-// // HandleMessageReceived is a Go routine that handles the messages received
-// func (n *Node) HandleMessageReceived() {
+// signalNodeStart sends a signal to Locksmith server that the node has started
+// it is for Locksmith server to respond with the current RPC map
+func (n *Node) signalNodeStart() error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+	request := &message.Request{
+		From:    n.Pid,
+		To:      0,
+		Code:    message.SIGNAL_START,
+		Payload: nil,
+	}
+	var reply message.Reply
+	err = message.SendMessage(fmt.Sprintf("localhost:%d", config.ConfigLocksmith.Port), "LockSmith.SignalStart", request, &reply)
+	if err != nil {
+		return err
+	}
+	n.RpcMap = reply.Payload.(map[int]string)
+	log.Printf("Node %d RPC map updated: %+v\n", n.Pid, n.RpcMap)
+	// Relay updated RPC map to others
+	for pid, address := range n.RpcMap {
+		if pid == n.Pid || pid == 0 {
+			continue
+		}
+		request = &message.Request{
+			From:    n.Pid,
+			To:      pid,
+			Code:    message.UPDATE_RPC_MAP,
+			Payload: n.RpcMap,
+		}
+		err = message.SendMessage(address, "Node.UpdateRpcMap", request, &reply)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	return nil
+}
 
-// 	for msg := range n.RecvChannel {
-// 		switch msg.Payload["type"] {
-// 		case "YOU_ARE_COORDINATOR":
-// 			isCoordinator := true
-// 			n.IsCoordinator = &isCoordinator
-// 			log.Printf("Node %d is the coordinator now!\n", n.Pid)
-// 			n.StartRouter()
-// 		case "BROADCAST_VIRTUAL_NODES":
-// 			location := msg.Payload["locationData"]
-// 			virtualNode := msg.Payload["virtualNodeData"]
-// 			n.VirtualNodeLocation = location.([]int)
-// 			n.VirtualNodeMap = virtualNode.(map[int]string)
-// 		}
-// 	}
-// }
+// Create virtual nodes
+func (n *Node) createVirtualNodes() error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
 
-// // Create virtual nodes
-// func (n *Node) CreateVirtualNodes(Pid int) error {
-// 	conf, err := config.GetConfig()
-// 	if err != nil {
-// 		return err
-// 	}
+	virtualNodesData := make(map[int]string)
+	virtualLocations := make([]int, 0)
 
-// 	for i := 1; i <= conf.VirtualNodesCount; i++ {
-// 		virtualNode := strconv.Itoa(Pid) + "-" + strconv.Itoa(i)
-// 		location, e := config.GetHash(virtualNode)
-// 		if e != nil {
-// 			return e
-// 		}
-// 		log.Println("Virtual node ", virtualNode, "has started")
-// 		n.SendSignal(0, &data.Data{
-// 			From: Pid,
-// 			To:   0,
-// 			Payload: map[string]interface{}{
-// 				"type":            "UPDATE_VIRTUAL_NODE",
-// 				"virtualNodeData": virtualNode,
-// 				"locationData":    location,
-// 			},
-// 		})
-// 	}
-// 	return nil
-// }
+	for i := 1; i <= config.VirtualNodesCount; i++ {
+		virtualNode := strconv.Itoa(n.Pid) + "-" + strconv.Itoa(i)
+		ulocation, e := util.GetHash(virtualNode)
+		location := int(ulocation)
+		if e != nil {
+			return e
+		}
 
-// // Start starts up a node, running receiving channel
-// func (n *Node) Start() error {
-// 	log.Printf("Node [%d] has started!\n", n.Pid)
+		virtualNodesData[location] = virtualNode
+		virtualLocations = append(virtualLocations, location)
+	}
+	request := &message.Request{
+		From: n.Pid,
+		To:   0,
+		Code: message.CREATE_VIRTUAL_NODE,
+		Payload: map[string]interface{}{
+			"virtualNodeMap":      virtualNodesData,
+			"virtualNodeLocation": virtualLocations,
+		},
+	}
+	var reply message.Reply
+	err = message.SendMessage(n.RpcMap[0], "LockSmith.CreateVirtualNodes", request, &reply)
+	if err != nil {
+		return err
+	}
+	payload := reply.Payload.(map[string]interface{})
+	n.VirtualNodeMap = payload["virtualNodeMap"].(map[int]string)
+	n.VirtualNodeLocation = payload["virtualNodeLocation"].([]int)
+	log.Printf("Node %d has created virtual nodes: %+v | %+v\n", n.Pid, n.VirtualNodeLocation, n.VirtualNodeMap)
 
-// 	// Create virtual node
-// 	err := n.CreateVirtualNodes(n.Pid)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	go n.HandleMessageReceived()
-// 	return nil
-// }
+	// Relay updated virtual nodes to others
+	for pid, address := range n.RpcMap {
+		if pid == n.Pid || pid == 0 {
+			continue
+		}
+		request = &message.Request{
+			From: n.Pid,
+			To:   pid,
+			Code: message.UPDATE_VIRTUAL_NODES,
+			Payload: map[string]interface{}{
+				"virtualNodeMap":      n.VirtualNodeMap,
+				"virtualNodeLocation": n.VirtualNodeLocation,
+			},
+		}
+		err = message.SendMessage(address, "Node.UpdateVirtualNodes", request, &reply)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	return nil
+}
 
 // Starts the router
 func (n *Node) startRouter() {
 	config, err := config.GetConfig()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	log.Printf("Node %d listening to client's requests...\n", n.Pid)
 	go func() {
@@ -137,6 +190,6 @@ func (n *Node) startRouter() {
 func (n *Node) stopRouter() {
 	err := n.Router.Close()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
