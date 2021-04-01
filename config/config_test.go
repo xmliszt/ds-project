@@ -13,12 +13,12 @@ var expectedConfig = &Config{
 	},
 	ConfigNode: ConfigNode{
 		Number:            5,
-		HeartbeatInterval: 5,
+		HeartbeatInterval: 2,
 		VirtualNodesCount: 3,
 	},
 	ConfigTimeout: ConfigTimeout{
-		HeartBeatTimeout:    15,
-		NodeCreationTimeout: 60,
+		HeartBeatTimeout:    8,
+		NodeCreationTimeout: 10,
 	},
 }
 

@@ -1,30 +1,27 @@
 {
- "1006969": {
-  "Value": "mySectret",
-  "Role": 100
- },
- "1007070": {
-  "Value": "yourSecret",
-  "Role": 1
- },
- "126": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
- },
- "127": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
- },
- "128": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
- },
- "129": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
- },
- "130": {
-  "Value": "hashed_Vict0r1aSecret3",
-  "Role": 3
- }
+  "126": {
+    "Alias": "workspace_1_secret",
+    "Value": "hashed_Vict0r1aSecret",
+    "Role": 3
+  },
+  "127": {
+    "Alias": "workspace_2_secret",
+    "Value": "hashed_Vict0r2aSecret",
+    "Role": 3
+  },
+  "128": {
+    "Alias": "workspace_3_secret",
+    "Value": "hashed_Vict0r3aSecret",
+    "Role": 3
+  },
+  "129": {
+    "Alias": "workspace_4_secret",
+    "Value": "hashed_Vict0r4aSecret",
+    "Role": 3
+  },
+  "130": {
+    "Alias": "workspace_5_secret",
+    "Value": "hashed_Vict0r5aSecret",
+    "Role": 3
+  }
 }

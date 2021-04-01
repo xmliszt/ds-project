@@ -2,9 +2,10 @@ package rpc
 
 import (
 	"fmt"
+	"log"
 	"strconv"
-	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/data"
 )
@@ -15,23 +16,15 @@ type Node struct {
 	Pid                 int                     `validate:"gte=0"`    // Node ID
 	Ring                []int                   `validate:"required"` // Ring structure of nodes
 	RecvChannel         chan *data.Data         `validate:"required"` // Receiving channel
-	SendChannel         chan *data.Data         `validate:"required"` // Sending channel
 	RpcMap              map[int]chan *data.Data `validate:"required"` // Map node ID to their receiving channels
-	HeartBeatTable      map[int]bool            // Heartbeat table
+	HeartBeatTable      map[int]bool
 	VirtualNodeLocation []int
 	VirtualNodeMap      map[int]string
+	Router              *echo.Echo
 }
 
 // HandleMessageReceived is a Go routine that handles the messages received
 func (n *Node) HandleMessageReceived() {
-
-	// Test a dead node
-	if n.Pid == 5 {
-		go func() {
-			time.Sleep(time.Second * 30)
-			defer close(n.RecvChannel)
-		}()
-	}
 
 	for msg := range n.RecvChannel {
 		switch msg.Payload["type"] {
@@ -50,6 +43,8 @@ func (n *Node) HandleMessageReceived() {
 		case "YOU_ARE_COORDINATOR":
 			isCoordinator := true
 			n.IsCoordinator = &isCoordinator
+			log.Printf("Node %d is the coordinator now!\n", n.Pid)
+			n.StartRouter()
 		case "BROADCAST_VIRTUAL_NODES":
 			location := msg.Payload["locationData"]
 			virtualNode := msg.Payload["virtualNodeData"]
@@ -72,7 +67,7 @@ func (n *Node) CreateVirtualNodes(Pid int) error {
 		if e != nil {
 			return e
 		}
-		fmt.Println("Virtual node ", virtualNode, "has started")
+		log.Println("Virtual node ", virtualNode, "has started")
 		n.SendSignal(0, &data.Data{
 			From: Pid,
 			To:   0,
@@ -88,7 +83,7 @@ func (n *Node) CreateVirtualNodes(Pid int) error {
 
 // Start starts up a node, running receiving channel
 func (n *Node) Start() error {
-	fmt.Printf("Node [%d] has started!\n", n.Pid)
+	log.Printf("Node [%d] has started!\n", n.Pid)
 
 	// Create virtual node
 	err := n.CreateVirtualNodes(n.Pid)
@@ -101,13 +96,36 @@ func (n *Node) Start() error {
 
 // Start starts up a node, running receiving channel
 func (n *Node) StartDeadNode() {
-	fmt.Printf("Node [%d] has started!\n", n.Pid)
+	log.Printf("Node [%d] has started!\n", n.Pid)
 	go n.HandleMessageReceived()
 }
 
 // TearDown terminates node, closes all channels
 func (n *Node) TearDown() {
+	log.Println(n.RecvChannel)
 	close(n.RecvChannel)
-	close(n.SendChannel)
-	fmt.Printf("Node [%d] has terminated!\n", n.Pid)
+	log.Printf("Node [%d] has terminated!\n", n.Pid)
+}
+
+// Starts the router
+func (n *Node) StartRouter() {
+	config, err := config.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("Node %d listening to client's requests...\n", n.Pid)
+	go func() {
+		err := n.Router.Start(fmt.Sprintf(":%d", config.Port))
+		if err != nil {
+			log.Printf("Node %d REST server closed!\n", n.Pid)
+		}
+	}()
+}
+
+// Shutdown the router
+func (n *Node) StopRouter() {
+	err := n.Router.Close()
+	if err != nil {
+		panic(err)
+	}
 }

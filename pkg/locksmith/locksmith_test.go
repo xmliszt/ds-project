@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/data"
 	"github.com/xmliszt/e-safe/pkg/rpc"
 	"gopkg.in/go-playground/validator.v9"
@@ -26,21 +27,15 @@ func TestInitializeLocksmith(t *testing.T) {
 func TestInitializeNodes(t *testing.T) {
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			Ring:   make([]int, 0),
-			RpcMap: make(map[int]chan *data.Data),
+			Ring:           make([]int, 0),
+			RpcMap:         make(map[int]chan *data.Data),
+			HeartBeatTable: make(map[int]bool),
 		},
 		Nodes: make(map[int]*rpc.Node),
 	}
 	locksmith.InitializeNodes(3)
 	if len(locksmith.Nodes) < 3 || len(locksmith.LockSmithNode.Ring) < 3 || len(locksmith.LockSmithNode.RpcMap) < 3 {
 		t.Errorf("Expected 3 nodes to be created, but have incomplete creation: %d", len(locksmith.Nodes))
-	}
-	for _, node := range locksmith.Nodes {
-		validate := validator.New()
-		err := validate.Struct(node)
-		if err != nil {
-			t.Error(err)
-		}
 	}
 }
 
@@ -77,6 +72,7 @@ func TestStartAllNodes(t *testing.T) {
 	locksmith.LockSmithNode.HeartBeatTable = make(map[int]bool)
 	iscoordinator := false
 	for i := 1; i <= 3; i++ {
+		router := api.GetRouter()
 		newNode := &rpc.Node{
 			Pid:           i,
 			IsCoordinator: &iscoordinator,
@@ -84,6 +80,7 @@ func TestStartAllNodes(t *testing.T) {
 			RpcMap: map[int]chan *data.Data{
 				0: locksmith.LockSmithNode.RecvChannel,
 			},
+			Router: router,
 		}
 		locksmith.Nodes[i] = newNode
 		locksmith.LockSmithNode.RpcMap[i] = newNode.RecvChannel
@@ -99,6 +96,7 @@ func TestStartAllNodes(t *testing.T) {
 			t.Errorf("Expected Node [%d] to be alive, but yet it is not alive!", pid)
 		}
 	}
+	locksmith.Nodes[3].StopRouter()
 }
 
 // Expected length of Nodes to increase after spawning new node
@@ -132,11 +130,10 @@ func TestSpawnNewNode(t *testing.T) {
 }
 
 func TestElection(t *testing.T) {
-	mockChan := make(chan *data.Data)
-	iscoordinator := false
+	mockChan := make(chan *data.Data, 1)
+	isCoordinator := false
 	locksmith := &LockSmith{
 		LockSmithNode: &rpc.Node{
-			Ring: make([]int, 0),
 			RpcMap: map[int]chan *data.Data{
 				3: mockChan,
 			},
@@ -148,13 +145,12 @@ func TestElection(t *testing.T) {
 			},
 		},
 		Nodes: map[int]*rpc.Node{
-			1: {},
-			2: {},
 			3: {
+				Pid:           3,
+				IsCoordinator: &isCoordinator,
 				RecvChannel:   mockChan,
-				IsCoordinator: &iscoordinator,
+				Router:        api.GetRouter(),
 			},
-			4: {},
 		},
 	}
 	locksmith.Nodes[3].StartDeadNode()

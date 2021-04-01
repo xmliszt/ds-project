@@ -92,10 +92,10 @@ func ReadDataFile(pid int) (map[string]interface{}, error) {
 // WriteUsersFile takes updates the user file with the new users provided
 func WriteUsersFile(addUsers map[string]interface{}) error {
 
-	originalFileContent, readError := ReadUsersFile()
+	originalFileContent, log := ReadUsersFile()
 
-	if readError != nil {
-		return readError
+	if log != nil {
+		return log
 	}
 
 	// Update the values from the file
@@ -129,10 +129,10 @@ func WriteDataFile(pid int, addData map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	originalFileContent, readError := ReadDataFile(pid)
+	originalFileContent, log := ReadDataFile(pid)
 
-	if readError != nil {
-		return readError
+	if log != nil {
+		return log
 	}
 
 	for key, value := range addData {
