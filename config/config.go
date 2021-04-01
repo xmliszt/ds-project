@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"hash/fnv"
 	"os"
 	"path/filepath"
@@ -13,14 +12,19 @@ import (
 )
 
 type Config struct {
-	ConfigServer  `yaml:"Server"`
-	ConfigNode    `yaml:"Node"`
-	ConfigTimeout `yaml:"Timeout"`
+	ConfigServer    `yaml:"Server"`
+	ConfigNode      `yaml:"Node"`
+	ConfigTimeout   `yaml:"Timeout"`
+	ConfigLocksmith `yaml:"Locksmith"`
 }
 
 type ConfigServer struct {
 	Host string `yaml:"Host"`
 	Port int    `yaml:"Port"`
+}
+
+type ConfigLocksmith struct {
+	Port int `yaml:"Port"`
 }
 
 type ConfigNode struct {
@@ -76,7 +80,6 @@ func GetConfig() (*Config, error) {
 			paths := strings.Split(file, "/")
 			paths = paths[:len(paths)-2]
 			rootPath := "/" + filepath.Join(paths...)
-			fmt.Println(rootPath)
 			configPath := filepath.Join(rootPath, "config.yaml")
 			config, err := LoadConfig(configPath)
 			if err != nil {
