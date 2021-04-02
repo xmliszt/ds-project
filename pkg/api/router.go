@@ -18,6 +18,11 @@ func GetRouter() *echo.Echo {
 	apiRouter := router.Group("/api/v1")
 	dashboardRouter := router.Group("/dashboard")
 
+	// Logger middleware
+	router.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format: "${time_rfc3339} From: ${remote_ip} Method: ${method} URI: ${uri} Status: ${status} Error: ${error} Latency: ${latency_human}\n",
+	}))
+
 	// Bind JWT token auth to sub-routers
 	apiRouter.Use(middleware.JWT([]byte("secret")))
 	dashboardRouter.Use(middleware.JWT([]byte("secret")))
