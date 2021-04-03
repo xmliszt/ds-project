@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/xmliszt/e-safe/pkg/file"
 	"github.com/xmliszt/e-safe/pkg/locksmith"
 	"github.com/xmliszt/e-safe/pkg/node"
 	"github.com/xmliszt/e-safe/pkg/register"
@@ -12,6 +13,9 @@ import (
 
 func main() {
 
+	if err := file.CreateStoragePath(); err != nil {
+		log.Fatal(err)
+	}
 	register.Regsiter()
 
 	var role string

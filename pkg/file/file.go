@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 // FileMethods contains all the methods associated with manipulating OS files
@@ -17,26 +16,14 @@ type FileMethods interface {
 	WriteDataFile()
 }
 
-func dataFilePathNode(nodePID int) (string, error) {
-	id := strconv.Itoa(nodePID)
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	dataFilePath := filepath.Join(cwd, "nodeStorage", "node"+id, "data.json")
-	return dataFilePath, nil
-}
-
 // ReadUsersFile returns all the information from the global users.json file
 // Code adapted from: https://tutorialedge.net/golang/parsing-json-with-golang/
 func ReadUsersFile() (map[string]interface{}, error) {
 
-	cwd, err := os.Getwd()
-	fmt.Println(cwd)
+	userFilePath, err := GetUserFilePath()
 	if err != nil {
 		return nil, err
 	}
-	userFilePath := filepath.Join(cwd, "users.json")
 	jsonFile, osErr := os.Open(userFilePath)
 
 	if osErr != nil { // if we os.Open returns an error then handle it
@@ -63,7 +50,7 @@ func ReadUsersFile() (map[string]interface{}, error) {
 // ReadDataFile returns all the information from the data.json of the respective node's local file
 func ReadDataFile(pid int) (map[string]interface{}, error) {
 
-	filePath, err := dataFilePathNode(pid)
+	filePath, err := GetNodeFilePath(pid)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +112,7 @@ func WriteUsersFile(addUsers map[string]interface{}) error {
 // WriteDataFile taks in the variable with map type then update the user file
 func WriteDataFile(pid int, addData map[string]interface{}) error {
 
-	filePath, err := dataFilePathNode(pid)
+	filePath, err := GetNodeFilePath(pid)
 	if err != nil {
 		return err
 	}
@@ -154,8 +141,7 @@ func WriteDataFile(pid int, addData map[string]interface{}) error {
 // OverwriteDatafromFile taks in the variable with map type then update the user file
 func OverwriteDataFile(pid int, addData map[string]interface{}) error {
 
-	filePath, err := dataFilePathNode(pid)
-
+	filePath, err := GetNodeFilePath(pid)
 	if err != nil {
 		return err
 	}

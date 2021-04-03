@@ -12,7 +12,7 @@ import (
 	"github.com/xmliszt/e-safe/pkg/user"
 )
 
-// Put a secret
+// Put a secret, if exists, update. If does not exist, create a new one
 func (n *Node) putSecret(ctx echo.Context) error {
 	secret := new(secret.Secret)
 	if err := ctx.Bind(secret); err != nil {
@@ -80,7 +80,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 		})
 	}
 	// Handle delete a secret
-	err := secret.DeleteSecret(1, "131")
+	err := secret.PutSecret(1, "131", nil)
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,

@@ -2,6 +2,7 @@ package secret
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/xmliszt/e-safe/pkg/file"
@@ -28,7 +29,7 @@ func encodeSecret(data interface{}) (*Secret, error) {
 	return secret, nil
 }
 
-func decodeSecret(secret Secret) interface{} {
+func decodeSecret(secret *Secret) interface{} {
 	var r interface{} = secret
 	return r
 }
@@ -74,29 +75,50 @@ func GetSecrets(pid int, from int, to int) (map[string]*Secret, error) {
 	}
 }
 
-// PutSecret place a specific secret within the respective data file
-func PutSecret(pid int, key string, secret Secret) error {
-	secretVal := decodeSecret(secret)
-	newSecret := map[string]interface{}{key: secretVal}
-	fileError := file.WriteDataFile(pid, newSecret)
-	if fileError != nil {
-		return nil
-	} else {
-		return fileError
-	}
-}
-
-// DeleteSecret deletes a secret from a data file from a given pid machine
-func DeleteSecret(pid int, key string) error {
+// PutSecret handles creation of a secret
+// if the secret key exists, throw error
+func PutSecret(pid int, key string, secret *Secret) error {
 	allData, fileError := file.ReadDataFile(pid)
 	if fileError != nil {
 		return fileError
-	} else {
-		delete(allData, key)
-		overwriteError := file.OverwriteDataFile(pid, allData)
-		if overwriteError != nil {
-			return overwriteError
-		}
-		return nil
 	}
+
+	if _, ok := allData[key]; ok {
+		return fmt.Errorf("key [%s] exists, creation failed", key)
+	}
+
+	secretVal := decodeSecret(secret)
+	secretToPut := map[string]interface{}{key: secretVal}
+	fileError = file.WriteDataFile(pid, secretToPut)
+	if fileError != nil {
+		return fileError
+	}
+	return nil
+}
+
+// UpdateSecret updates an existing secret or delete a secret (update it to null)
+func UpdateSecret(pid int, key string, secret *Secret) error {
+	var secretVal interface{}
+	if secret == nil {
+		secretVal = nil
+	} else {
+		secretVal = decodeSecret(secret)
+	}
+	allData, fileError := file.ReadDataFile(pid)
+	if fileError != nil {
+		return fileError
+	}
+
+	// check if the key exists in the data file
+	// if exist, overwrite
+	// if does not exist, throw error
+	if _, ok := allData[key]; !ok {
+		return fmt.Errorf("key [%s] does not exist", key)
+	}
+	newSecret := map[string]interface{}{key: secretVal}
+	fileError = file.WriteDataFile(pid, newSecret)
+	if fileError != nil {
+		return fileError
+	}
+	return nil
 }
