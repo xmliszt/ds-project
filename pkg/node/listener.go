@@ -24,7 +24,7 @@ func (n *Node) UpdateHeartbeatTable(request *message.Request, reply *message.Rep
 func (n *Node) AssignCoordinator(request *message.Request, reply *message.Reply) error {
 	log.Printf("Node %d is the new coordinator!\n", n.Pid)
 	n.IsCoordinator = true
-	n.startRouter()
+	go n.startRouter()
 	return nil
 }
 

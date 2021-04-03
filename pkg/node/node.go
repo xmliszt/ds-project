@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -43,7 +44,7 @@ func Start(nodeID int) {
 		log.Fatal(err)
 	}
 
-	routerBuilder := &api.RouterBuilder{}
+	router := api.GetRouter()
 
 	node := &Node{
 		IsCoordinator:       false,
@@ -52,7 +53,7 @@ func Start(nodeID int) {
 		VirtualNodeLocation: make([]int, 0),
 		VirtualNodeMap:      make(map[int]string),
 		HeartBeatTable:      make(map[int]bool),
-		Router:              routerBuilder.New(),
+		Router:              router,
 	}
 
 	err = node.signalNodeStart() // Send start signal to Locksmith
@@ -66,7 +67,10 @@ func Start(nodeID int) {
 
 	// Start RPC server
 	log.Printf("Node %d listening on: %v\n", node.Pid, address)
-	rpc.Register(node)
+	err = rpc.Register(node)
+	if err != nil {
+		log.Fatal(err)
+	}
 	rpc.Accept(inbound)
 }
 
@@ -177,18 +181,16 @@ func (n *Node) startRouter() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Node %d listening to client's requests...\n", n.Pid)
-	go func() {
-		err := n.Router.Start(fmt.Sprintf(":%d", config.ConfigServer.Port))
-		if err != nil {
-			log.Printf("Node %d REST server closed!\n", n.Pid)
-		}
-	}()
+	err = n.Router.Start(fmt.Sprintf(":%d", config.ConfigServer.Port))
+	if err != nil {
+		// log.Printf("Node %d REST server closed!\n", n.Pid)
+	}
 }
 
 // Shutdown the router
 func (n *Node) stopRouter() {
-	err := n.Router.Close()
+	log.Printf("Node %d REST server closed!\n", n.Pid)
+	err := n.Router.Shutdown(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}

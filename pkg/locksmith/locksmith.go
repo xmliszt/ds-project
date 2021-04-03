@@ -55,7 +55,10 @@ func Start() {
 
 	// Start RPC server
 	log.Printf("Locksmith server listening on: %v\n", address)
-	rpc.Register(locksmith)
+	err = rpc.Register(locksmith)
+	if err != nil {
+		log.Fatal(err)
+	}
 	rpc.Accept(inbound)
 }
 
@@ -98,7 +101,7 @@ func (locksmith *LockSmith) broadcastHeartbeatTable(excludeNodeID interface{}) {
 		excludeNodeID = excludeNodeID.(int)
 	}
 	for pid, address := range locksmith.RpcMap {
-		if pid == excludeNodeID || pid == 0 {
+		if pid == excludeNodeID || pid == 0 || locksmith.HeartBeatTable[pid] {
 			continue
 		}
 		request := &message.Request{
@@ -108,7 +111,10 @@ func (locksmith *LockSmith) broadcastHeartbeatTable(excludeNodeID interface{}) {
 			Payload: locksmith.HeartBeatTable,
 		}
 		var reply message.Reply
-		message.SendMessage(address, "Node.UpdateHeartbeatTable", request, &reply)
+		err := message.SendMessage(address, "Node.UpdateHeartbeatTable", request, &reply)
+		if err != nil {
+			log.Printf("Locksmith failed to send Heartbeat Table to Node %d: %s\n", pid, err)
+		}
 	}
 }
 
