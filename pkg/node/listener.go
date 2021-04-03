@@ -3,7 +3,10 @@ package node
 import (
 	"log"
 
+	"github.com/xmliszt/e-safe/pkg/file"
 	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/pkg/secret"
+	"github.com/xmliszt/e-safe/util"
 )
 
 // UpdateRpcMap updates node's RPC Map
@@ -44,5 +47,45 @@ func (n *Node) UpdateVirtualNodes(request *message.Request, reply *message.Reply
 	n.VirtualNodeLocation = locations.([]int)
 	n.VirtualNodeMap = virtualNode.(map[int]string)
 	log.Printf("Node %d updated virtual nodes: %v | %+v\n", n.Pid, n.VirtualNodeLocation, n.VirtualNodeMap)
+	return nil
+}
+
+// receives the message from Coordinator and do what is on the board
+// REMEMBER to capitalize the function name
+// Strict Consistency with R = 2. Send ACK directly to coordinator
+func (n *Node) OwnerNodeDown(request *message.Request, reply *message.Reply) error {
+	// func (n *Node) StrictDown(replicationList []string){
+	log.Printf("Owner Node down. ")
+	// Coordintor send message to
+	return nil
+}
+
+func (n *Node) StrictReplication(request *message.Request, reply *message.Reply) error {
+	log.Printf("Begin strict replication")
+
+	// parse secret
+	payload := request.Payload.(map[string]interface{})
+	hashedValue := payload["hashedValue"].(string)
+	secret := payload["data"].(secret.Secret)
+
+	dataToWrite := map[string]interface{}{
+		hashedValue: secret,
+	}
+
+	// Write to respective node storage file
+	writeErr := file.WriteDataFile(n.Pid, dataToWrite)
+	if writeErr != nil {
+		log.Fatal("Data file write failed for node %d", n.Pid)
+	}
+
+	// nextVNode = util.MapHashToVNode()
+
+	nextVNodePid := util.FindNextVNode(n.Ring, n.VirtualNodeMap, n.VirtualNodeLocation, hashedValue)
+	vNodeActualPid := util.NodePidFromVNode(nextVNodePid)
+	// Check if the next node is alive
+	if n.checkHeartbeat(vNodeActualPid) {
+
+	}
+	// Coordintor send message to
 	return nil
 }

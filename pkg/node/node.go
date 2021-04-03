@@ -7,11 +7,13 @@ import (
 	"net"
 	"net/rpc"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/pkg/secret"
 	"github.com/xmliszt/e-safe/util"
 )
 
@@ -194,4 +196,96 @@ func (n *Node) stopRouter() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Strict Consistency with R = 2. Send ACK directly to coordinator
+func (n *Node) strictDown(secret secret.Secret) {
+	log.Printf("Owner Node for specified ")
+	// Get Hash value of description
+	hashedValue, err := util.GetHash(secret.Alias)
+
+	// Coordintor send message
+	// Figure out a list of who to send to using generateReplicationList
+	// err := message.SendMessage(replicationList, "Node.UpdateRpcMap", request, &reply)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+}
+
+// Takes in Hash value. Will generate list of nodes to store the data
+// need to check the logic later
+func (n *Node) generateReplicationList(hashValue uint32) []string {
+	var VirtualNodeList []string
+	var nodeIdList []int
+	var positionForOwner int
+	nextPid, nextVirtualNode := n.findNextPid(hashValue)
+	VirtualNodeList = append(VirtualNodeList, nextVirtualNode)
+	nodeIdList = append(nodeIdList, nextPid)
+	hashValueForOwnerNode, _ := util.GetHash(nextVirtualNode)
+	for idx, location := range n.VirtualNodeLocation {
+		if location == int(hashValueForOwnerNode) {
+			positionForOwner = idx
+		}
+	}
+	if len(VirtualNodeList) > 3 {
+		for indx, position := range n.VirtualNodeLocation {
+			if indx > positionForOwner {
+				nextId := n.findPidByVname(n.VirtualNodeMap[position])
+				// need to check whether the id in the nodeIdList or not
+				if contain(nodeIdList, nextId) {
+					continue
+				} else {
+					nodeIdList = append(nodeIdList, nextId)
+					VirtualNodeList = append(VirtualNodeList, n.VirtualNodeMap[position])
+				}
+			}
+		}
+	}
+	return VirtualNodeList
+
+}
+
+func contain(nodeIdList []int, id int) bool {
+	for id1 := range nodeIdList {
+		if id1 == id {
+			return true
+		} else {
+			return false
+		}
+	}
+}
+
+// No input. Will generate list of nodes to store the data.
+func (n *Node) generateRecoveryList() {}
+
+// TODO: move to util
+// This function will takes in the hashed value then find the next node's pid and next node's virtual node name
+func (n *Node) findNextPid(hashedValue uint32) (int, string) {
+	var nextVirtualNode string
+	var nextPid int
+	var err error
+	for idx, location := range n.VirtualNodeLocation {
+		if int(hashedValue) < location {
+			// current_virtual_node := n.RingMap[x]
+			nextVirtualNode = n.VirtualNodeMap[n.Ring[(idx+1)]]
+			string_list := strings.Split(nextVirtualNode, "-")
+			nextPid, err = strconv.Atoi(string_list[0])
+			if err != nil {
+				fmt.Println(err)
+			}
+			break
+		}
+	}
+	return nextPid, nextVirtualNode
+}
+
+// TODO: Already in Util, consider removing
+func (n *Node) findPidByVname(vName string) int {
+	string_list := strings.Split(vName, "-")
+	Pid, _ := strconv.Atoi(string_list[0])
+	return Pid
+}
+
+func (n *Node) checkHeartbeat(pid int) bool {
+	return n.HeartBeatTable[pid]
 }
