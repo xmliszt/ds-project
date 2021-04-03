@@ -2,10 +2,8 @@ package file
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 )
 
 // FileMethods contains all the methods associated with manipulating OS files
@@ -24,10 +22,20 @@ func ReadUsersFile() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	jsonFile, osErr := os.Open(userFilePath)
 
-	if osErr != nil { // if we os.Open returns an error then handle it
-		return nil, osErr
+	// if file not exists, create it
+	var jsonFile *os.File
+	var osErr error
+	if _, err := os.Stat(userFilePath); err != nil {
+		jsonFile, osErr = os.Create(userFilePath)
+		if osErr != nil {
+			return nil, osErr
+		}
+	} else {
+		jsonFile, osErr = os.Open(userFilePath)
+		if osErr != nil {
+			return nil, osErr
+		}
 	}
 
 	defer jsonFile.Close()
@@ -41,7 +49,7 @@ func ReadUsersFile() (map[string]interface{}, error) {
 
 	// Unmarshal parses the byteValue array to a type defined by fileContents
 	marshalError := json.Unmarshal([]byte(byteValue), &fileContents)
-	if marshalError != nil { // if we os.Open returns an error then handle it
+	if marshalError != nil {
 		return nil, marshalError
 	}
 	return fileContents, nil
@@ -54,7 +62,21 @@ func ReadDataFile(pid int) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	jsonFile, osErr := os.Open(filePath)
+
+	// if file not exists, create it
+	var jsonFile *os.File
+	var osErr error
+	if _, err := os.Stat(filePath); err != nil {
+		jsonFile, osErr = os.Create(filePath)
+		if osErr != nil {
+			return nil, osErr
+		}
+	} else {
+		jsonFile, osErr = os.Open(filePath)
+		if osErr != nil {
+			return nil, osErr
+		}
+	}
 
 	if osErr != nil {
 		return nil, osErr
@@ -96,12 +118,10 @@ func WriteUsersFile(addUsers map[string]interface{}) error {
 
 	}
 
-	cwd, err := os.Getwd()
-	fmt.Println(cwd)
+	userFilePath, err := GetUserFilePath()
 	if err != nil {
 		return err
 	}
-	userFilePath := filepath.Join(cwd, "users.json")
 	var writeError = ioutil.WriteFile(userFilePath, file, 0644)
 	if writeError != nil {
 		return writeError
