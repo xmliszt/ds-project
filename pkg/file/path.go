@@ -26,6 +26,26 @@ func CreateStoragePath() error {
 	return nil
 }
 
+// CreateNodeStoragePath creates the particular directory for a node's storage
+// it will also create nodeStorage/ parent directory if it is not found
+func CreateNodeStoragePath(nodeID int) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	nodeStoragePath := filepath.Join(cwd, "nodeStorage")
+	if _, err := os.Stat(nodeStoragePath); os.IsNotExist(err) {
+		os.Mkdir(nodeStoragePath, 0777)
+	}
+
+	storagePath := filepath.Join(cwd, "nodeStorage", fmt.Sprintf("node%d", nodeID))
+	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
+		os.Mkdir(storagePath, 0777)
+	}
+	return nil
+}
+
 // GetNodeFilePath returns the file path of secret that the node stores
 func GetNodeFilePath(nodeID int) (string, error) {
 
@@ -33,12 +53,7 @@ func GetNodeFilePath(nodeID int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	storagePath := filepath.Join(cwd, "nodeStorage", fmt.Sprintf("node%d", nodeID))
-	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
-		os.Mkdir(storagePath, 0777)
-	}
-
 	return filepath.Join(storagePath, "data.json"), nil
 }
 
