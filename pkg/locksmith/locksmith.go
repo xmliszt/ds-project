@@ -2,313 +2,171 @@ package locksmith
 
 import (
 	"fmt"
-	"sort"
+	"log"
+	"net"
+	"net/rpc"
+	"reflect"
 	"time"
 
 	"github.com/xmliszt/e-safe/config"
-	"github.com/xmliszt/e-safe/pkg/data"
-	"github.com/xmliszt/e-safe/pkg/rpc"
-	"github.com/xmliszt/e-safe/util"
+	"github.com/xmliszt/e-safe/pkg/message"
 )
 
 type LockSmith struct {
-	LockSmithNode *rpc.Node         `validate:"required"`
-	Nodes         map[int]*rpc.Node `validate:"required"`
-	Coordinator   int
+	Pid                 int            // Node ID
+	Ring                []int          // Ring structure of nodes
+	Coordinator         int            // Indicate the coordinator node number
+	RpcMap              map[int]string // Map node ID to their receiving address
+	HeartBeatTable      map[int]bool
+	VirtualNodeLocation []int
+	VirtualNodeMap      map[int]string
 }
 
 // Start is the main function that starts the entire program
-func Start() error {
+func Start() {
+
 	config, err := config.GetConfig()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	locksmithServer, err := InitializeLocksmith()
+	address, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", config.ConfigLocksmith.Port))
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-	go locksmithServer.HandleMessageReceived() // Run this as the main go routine, so do not need to create separate go routine
-	locksmithServer.InitializeNodes(config.Number)
-	fmt.Println("Locksmith [0] has started")
-	e := locksmithServer.StartAllNodes()
-	if e != nil {
-		return e
+	inbound, err := net.ListenTCP("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	locksmith := &LockSmith{
+		Pid:                 0,
+		Coordinator:         0,
+		RpcMap:              make(map[int]string),
+		VirtualNodeLocation: make([]int, 0),
+		VirtualNodeMap:      make(map[int]string),
+		HeartBeatTable:      make(map[int]bool),
 	}
 
-	locksmithServer.CheckHeartbeat() // Start periodically checking Node's heartbeat
+	// Populate each node's RPC listening addresses
+	locksmith.RpcMap[0] = "localhost:5000" // Add Locksmith receiving RPC address
 
-	return nil
+	go locksmith.checkHeartbeat()           // Start periodically checking Node's heartbeat
+	go locksmith.monitorCoordinatorStatus() // Start periodically monitor and update coordinator
+
+	// Start RPC server
+	log.Printf("Locksmith server listening on: %v\n", address)
+	err = rpc.Register(locksmith)
+	if err != nil {
+		log.Fatal(err)
+	}
+	rpc.Accept(inbound)
 }
 
-// InitializeLocksmith initializes the locksmith server object
-func InitializeLocksmith() (*LockSmith, error) {
+// checkHeartbeat periodically check if node is alive
+func (locksmith *LockSmith) checkHeartbeat() {
 	config, err := config.GetConfig()
 	if err != nil {
-		return nil, err
-	}
-	receivingChannel := make(chan *data.Data, config.Number*config.VirtualNodesCount)
-	sendingChannel := make(chan *data.Data, config.Number*config.VirtualNodesCount)
-	isCoordinator := false
-	locksmithServer := &LockSmith{
-		LockSmithNode: &rpc.Node{
-			IsCoordinator:       &isCoordinator,
-			Pid:                 0,
-			RecvChannel:         receivingChannel,
-			SendChannel:         sendingChannel,
-			Ring:                make([]int, 0),
-			RpcMap:              make(map[int]chan *data.Data),
-			VirtualNodeLocation: make([]int, 0),
-			VirtualNodeMap:      make(map[int]string),
-			HeartBeatTable:      make(map[int]bool),
-		},
-		Nodes: make(map[int]*rpc.Node),
-	}
-	locksmithServer.LockSmithNode.RpcMap[0] = receivingChannel // Add Locksmith receiving channel to RpcMap
-	return locksmithServer, nil
-}
-
-// InitializeNodes initializes the number n nodes that Locksmith is going to create
-func (locksmith *LockSmith) InitializeNodes(n int) {
-	for i := 1; i <= n; i++ {
-		nodeRecvChan := make(chan *data.Data, 1)
-		nodeSendChan := make(chan *data.Data, 1)
-		signalChan := make(chan error, 1)
-		isCoordinator := false
-		newNode := &rpc.Node{
-			IsCoordinator: &isCoordinator,
-			Pid:           i,
-			RecvChannel:   nodeRecvChan,
-			SendChannel:   nodeSendChan,
-			Signal:        signalChan,
-		}
-		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, i)
-		locksmith.Nodes[i] = newNode
-		locksmith.LockSmithNode.RpcMap[i] = nodeRecvChan
-	}
-
-	for _, node := range locksmith.Nodes {
-		node.Ring = locksmith.LockSmithNode.Ring
-		node.RpcMap = locksmith.LockSmithNode.RpcMap
-	}
-}
-
-// HandleMessageReceived is a Go Routine to handle the messages received
-func (locksmith *LockSmith) HandleMessageReceived() {
-	for msg := range locksmith.LockSmithNode.RecvChannel {
-		switch msg.Payload["type"] {
-		// after node replica, node need to ack coordinator, then it need to ask the locksmith for the coordinator ID
-		case "ASK_COORDINATOR":
-			locksmith.LockSmithNode.SendSignal(msg.From, &data.Data{
-				From: locksmith.LockSmithNode.Pid,
-				To:   msg.From,
-				Payload: map[string]interface{}{
-					"type":          "REPLY_COORDINATOR",
-					"coordinatorID": locksmith.Coordinator,
-				},
-			})
-
-		case "REPLY_HEARTBEAT":
-			locksmith.LockSmithNode.HeartBeatTable[msg.From] = true
-		case "UPDATE_VIRTUAL_NODE":
-			location := int(msg.Payload["locationData"].(uint32))
-			virtualNode := msg.Payload["virtualNodeData"]
-			fmt.Println("Locksmith has received from ", virtualNode.(string))
-			// Update its own values
-			locksmith.LockSmithNode.VirtualNodeLocation = append(locksmith.LockSmithNode.VirtualNodeLocation, location)
-			locksmith.LockSmithNode.VirtualNodeMap[location] =
-				virtualNode.(string)
-
-			// Sort the location array
-			sort.Ints(locksmith.LockSmithNode.VirtualNodeLocation)
-
-			fmt.Printf("---Map of virtual node's 'Location' : 'Virtual Node Id'---\n%v\n---Array of virtual node's location---\n%v\n", locksmith.LockSmithNode.VirtualNodeMap, locksmith.LockSmithNode.VirtualNodeLocation)
-			// Broadcast to other nodes
-			for _, pid := range locksmith.LockSmithNode.Ring {
-				locksmith.LockSmithNode.SendSignal(pid, &data.Data{
-					From: locksmith.LockSmithNode.Pid,
-					To:   pid,
-					Payload: map[string]interface{}{
-						"type":            "BROADCAST_VIRTUAL_NODES",
-						"virtualNodeData": locksmith.LockSmithNode.VirtualNodeMap,
-						"locationData":    locksmith.LockSmithNode.VirtualNodeLocation,
-					},
-				})
-			}
-		}
-	}
-}
-
-// StartAllNodes starts up all created nodes
-func (locksmith *LockSmith) StartAllNodes() error {
-	for pid, node := range locksmith.Nodes {
-		err := node.Start()
-		if err != nil {
-			return err
-		}
-		locksmith.LockSmithNode.HeartBeatTable[pid] = true
-	}
-	coordinator := util.FindMax(locksmith.LockSmithNode.Ring)
-	// Send message to node to turn coordinator field to true
-	locksmith.LockSmithNode.SendSignal(coordinator, &data.Data{
-		From: locksmith.LockSmithNode.Pid,
-		To:   coordinator,
-		Payload: map[string]interface{}{
-			"type": "YOU_ARE_COORDINATOR",
-			"data": nil,
-		},
-	})
-	return nil
-}
-
-// CheckHeartbeat periodically check if node is alive
-func (locksmith *LockSmith) CheckHeartbeat() {
-	config, err := config.GetConfig()
-	if err != nil {
-		fmt.Println("Fatal: Heartbeat checking has crashed. Reason: ", err)
-		return
+		log.Fatal(err)
 	}
 	for {
-		for _, pid := range locksmith.LockSmithNode.Ring {
-			time.Sleep(time.Second * time.Duration(config.HeartbeatInterval))
-			if locksmith.LockSmithNode.HeartBeatTable[pid] {
-				go func(pid int) {
-					locksmith.LockSmithNode.HeartBeatTable[pid] = false
-					locksmith.LockSmithNode.SendSignal(pid, &data.Data{
-						From: locksmith.LockSmithNode.Pid,
-						To:   pid,
-						Payload: map[string]interface{}{
-							"type": "CHECK_HEARTBEAT",
-							"data": nil,
-						},
-					})
-					time.Sleep(time.Second * 1)
-					fmt.Println("Heartbeat Table: ", locksmith.LockSmithNode.HeartBeatTable)
-					if !locksmith.LockSmithNode.HeartBeatTable[pid] {
-						time.Sleep(time.Second * time.Duration(config.HeartBeatTimeout))
-						if !locksmith.LockSmithNode.HeartBeatTable[pid] {
-							fmt.Printf("Node [%d] is dead! Need to create a new node!\n", pid)
-							fmt.Println("LOCKSMITH", locksmith.LockSmithNode.VirtualNodeMap)
-							fmt.Println(locksmith.Nodes[pid].VirtualNodeMap)
-							// Election process
-							if *locksmith.Nodes[pid].IsCoordinator {
-								locksmith.Election()
-							}
-
-							// Teardown the particular node in the Nodes
-							delete(locksmith.Nodes, pid)
-
-							// Send heartbeat table to all nodes
-							locksmith.BroadcastHeartbeatTable()
-
-							// Check and Restart all dead nodes
-							locksmith.DeadNodeChecker()
-
-							// Send heartbeat table to all nodes
-							locksmith.BroadcastHeartbeatTable()
-
-							time.Sleep(time.Second * time.Duration(config.NodeCreationTimeout)) // allow sufficient time for node to restart, then resume heartbeat checking
-						}
-					}
-				}(pid)
+		time.Sleep(time.Second * time.Duration(config.HeartbeatInterval))
+		for pid := range locksmith.RpcMap {
+			if pid == 0 {
+				continue
+			}
+			heartbeatTableCopy := make(map[int]bool)
+			for k, v := range locksmith.HeartBeatTable {
+				heartbeatTableCopy[k] = v
+			}
+			nodeClient, err := rpc.Dial("tcp", locksmith.RpcMap[pid])
+			if err != nil {
+				// Node is down!
+				locksmith.HeartBeatTable[pid] = false
+			} else {
+				locksmith.HeartBeatTable[pid] = true
+				nodeClient.Close()
+			}
+			if !reflect.DeepEqual(locksmith.HeartBeatTable, heartbeatTableCopy) {
+				// Broadcast updated Heartbeat table
+				locksmith.broadcastHeartbeatTable(nil)
 			}
 		}
+		log.Println("Heartbeat Table: ", locksmith.HeartBeatTable)
 	}
 }
 
-// Send heartbeat table to all nodes
-func (locksmith *LockSmith) BroadcastHeartbeatTable() {
-	for _, pid := range locksmith.LockSmithNode.Ring {
-		locksmith.LockSmithNode.SendSignal(pid, &data.Data{
-			From: locksmith.LockSmithNode.Pid,
-			To:   pid,
-			Payload: map[string]interface{}{
-				"type": "UPDATE_HEARTBEAT",
-				"data": locksmith.LockSmithNode.HeartBeatTable,
-			},
-		})
-		fmt.Printf("Node [%d] has updated its heartbeat table from locksmith\n", pid)
+// broadcastHeartbeatTable sends heartbeat table to all nodes
+func (locksmith *LockSmith) broadcastHeartbeatTable(excludeNodeID interface{}) {
+	if excludeNodeID != nil {
+		excludeNodeID = excludeNodeID.(int)
 	}
-
-}
-
-func (locksmith *LockSmith) DeadNodeChecker() {
-	for k, v := range locksmith.LockSmithNode.HeartBeatTable {
-		if !v {
-			locksmith.SpawnNewNode(k)
-			fmt.Printf("Node [%d] has been revived!\n", k)
+	for pid, address := range locksmith.RpcMap {
+		if pid == excludeNodeID || pid == 0 || locksmith.HeartBeatTable[pid] {
+			continue
+		}
+		request := &message.Request{
+			From:    locksmith.Pid,
+			To:      pid,
+			Code:    message.UPDATE_HEARTBEAT_TABLE,
+			Payload: locksmith.HeartBeatTable,
+		}
+		var reply message.Reply
+		err := message.SendMessage(address, "Node.UpdateHeartbeatTable", request, &reply)
+		if err != nil {
+			log.Printf("Locksmith failed to send Heartbeat Table to Node %d: %s\n", pid, err)
 		}
 	}
 }
 
-// Elect the highest surviving Pid node to be coordinator
-func (locksmith *LockSmith) Election() {
-	var potentialCandidate []int
+// monitorCoordinatorStatus monitors heartbeat table and always assign the highest alive node as coordinator
+func (locksmith *LockSmith) monitorCoordinatorStatus() {
+	config, err := config.GetConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		time.Sleep(time.Second * time.Duration(config.CoordinatorMonitorInterval))
+		newCoordinatorID := 0
+		for pid, alive := range locksmith.HeartBeatTable {
+			if alive && pid > newCoordinatorID {
+				newCoordinatorID = pid
+			}
+		}
+		if newCoordinatorID != locksmith.Coordinator && newCoordinatorID > 0 {
+			locksmith.assignCoordinator(newCoordinatorID)
+		}
+	}
+}
 
-	for k, v := range locksmith.LockSmithNode.HeartBeatTable {
-		if v {
-			potentialCandidate = append(potentialCandidate, k)
+// assignCoordinator assigns the given node as the new coordinator
+func (locksmith *LockSmith) assignCoordinator(pid int) {
+	var reply message.Reply
+	var request *message.Request
+
+	// Remove the old coordinator
+	if locksmith.Coordinator > 0 && locksmith.HeartBeatTable[locksmith.Coordinator] {
+		request = &message.Request{
+			From:    locksmith.Pid,
+			To:      pid,
+			Code:    message.REMOVE_COORDINATOR,
+			Payload: nil,
+		}
+		err := message.SendMessage(locksmith.RpcMap[locksmith.Coordinator], "Node.RemoveCoordinator", request, &reply)
+		if err != nil {
+			panic(err)
 		}
 	}
 
-	coordinator := util.FindMax(potentialCandidate)
-	locksmith.Coordinator = coordinator
-
-	// Send message to node to turn coordinator field to true
-	locksmith.LockSmithNode.SendSignal(coordinator, &data.Data{
-		From: locksmith.LockSmithNode.Pid,
-		To:   coordinator,
-		Payload: map[string]interface{}{
-			"type": "YOU_ARE_COORDINATOR",
-			"data": nil,
-		},
-	})
-
-	fmt.Printf("Node [%d] is currently the newly elected coordinator!\n", locksmith.Coordinator)
-}
-
-// Spawn new nodes when a node is down
-func (locksmith *LockSmith) SpawnNewNode(n int) {
-	nodeRecvChan := make(chan *data.Data, 1)
-	nodeSendChan := make(chan *data.Data, 1)
-	isCoordinator := false
-	newNode := &rpc.Node{
-		IsCoordinator: &isCoordinator,
-		Pid:           n,
-		RecvChannel:   nodeRecvChan,
-		SendChannel:   nodeSendChan,
+	// Assign new coordinator
+	locksmith.Coordinator = pid
+	request = &message.Request{
+		From:    locksmith.Pid,
+		To:      pid,
+		Code:    message.ASSIGN_COORDINATOR,
+		Payload: nil,
 	}
-
-	locksmith.Nodes[n] = newNode
-	locksmith.LockSmithNode.RpcMap[n] = nodeRecvChan
-
-	locksmith.Nodes[n].StartDeadNode()
-	locksmith.LockSmithNode.HeartBeatTable[n] = true
-
-	// Update ring
-	found := util.IntInSlice(locksmith.LockSmithNode.Ring, n)
-	if !found {
-		locksmith.LockSmithNode.Ring = append(locksmith.LockSmithNode.Ring, n)
-	}
-
-	// Update node
-	for _, node := range locksmith.Nodes {
-		node.Ring = locksmith.LockSmithNode.Ring
-		node.RpcMap = locksmith.LockSmithNode.RpcMap
-	}
-
-}
-
-// TearDown terminates node, closes all channels
-func (locksmith *LockSmith) TearDown() {
-	close(locksmith.LockSmithNode.RecvChannel)
-	close(locksmith.LockSmithNode.SendChannel)
-	fmt.Printf("Locksmith Server [%d] has terminated!\n", locksmith.LockSmithNode.Pid)
-}
-
-// EndAllNodes starts teardown process of all created nodes
-func (locksmith *LockSmith) EndAllNodes() {
-	for _, node := range locksmith.Nodes {
-		node.TearDown()
+	err := message.SendMessage(locksmith.RpcMap[pid], "Node.AssignCoordinator", request, &reply)
+	if err != nil {
+		panic(err)
 	}
 }

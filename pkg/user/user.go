@@ -9,9 +9,9 @@ import (
 
 // User contains all the variables that are found in User database
 type User struct {
-	Username string `json:"Username"` // Username as string
-	Password string `json:"Password"` // Password as string
-	Role     int    `json:"Role"`     // Int to identify role (clearance level)
+	Username string `json:"username"` // Username as string
+	Password string `json:"password"` // Password as string
+	Role     int    `json:"role"`     // Int to identify role (clearance level)
 }
 
 // UserMethods contains all method references for interacting with the User database

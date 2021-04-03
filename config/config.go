@@ -1,8 +1,6 @@
 package config
 
 import (
-	"fmt"
-	"hash/fnv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,9 +11,9 @@ import (
 )
 
 type Config struct {
-	ConfigServer  `yaml:"Server"`
-	ConfigNode    `yaml:"Node"`
-	ConfigTimeout `yaml:"Timeout"`
+	ConfigServer    `yaml:"Server"`
+	ConfigNode      `yaml:"Node"`
+	ConfigLocksmith `yaml:"Locksmith"`
 }
 
 type ConfigServer struct {
@@ -23,15 +21,14 @@ type ConfigServer struct {
 	Port int    `yaml:"Port"`
 }
 
-type ConfigNode struct {
-	Number            int `yaml:"Number"`
-	HeartbeatInterval int `yaml:"HeartbeatInterval"`
-	VirtualNodesCount int `yaml:"VirtualNodesCount"`
+type ConfigLocksmith struct {
+	Port int `yaml:"Port"`
 }
 
-type ConfigTimeout struct {
-	HeartBeatTimeout    int `yaml:"HeartbeatTimeout"`
-	NodeCreationTimeout int `yaml:"NodeCreationTimeout"`
+type ConfigNode struct {
+	HeartbeatInterval          int `yaml:"HeartbeatInterval"`
+	CoordinatorMonitorInterval int `yaml:"CoordinatorMonitorInterval"`
+	VirtualNodesCount          int `yaml:"VirtualNodesCount"`
 }
 
 // LoadConfig loads the config from YAML file and return the config object
@@ -57,15 +54,6 @@ var lock = &sync.Mutex{}
 
 var globalConfig *Config
 
-func GetHash(s string) (uint32, error) {
-	h := fnv.New32a()
-	_, err := h.Write([]byte(s))
-	if err != nil {
-		return 0, err
-	}
-	return h.Sum32(), nil
-}
-
 // GetConfig is a singleton method that gets the loaded configuration object
 func GetConfig() (*Config, error) {
 	if globalConfig == nil {
@@ -76,7 +64,6 @@ func GetConfig() (*Config, error) {
 			paths := strings.Split(file, "/")
 			paths = paths[:len(paths)-2]
 			rootPath := "/" + filepath.Join(paths...)
-			fmt.Println(rootPath)
 			configPath := filepath.Join(rootPath, "config.yaml")
 			config, err := LoadConfig(configPath)
 			if err != nil {
