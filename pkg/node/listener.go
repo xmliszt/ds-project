@@ -70,7 +70,10 @@ func (n *Node) DeleteSecret(request *message.Request, reply *message.Reply) erro
 		return err
 	}
 	// relay deletion
-	go n.relaySecretDeletion(replicationFactor, keyToDelete, relayVirtualNodes)
+	err = n.relaySecretDeletion(replicationFactor, keyToDelete, relayVirtualNodes)
+	if err != nil {
+		return err
+	}
 
 	*reply = message.Reply{
 		From:    n.Pid,
@@ -98,7 +101,10 @@ func (n *Node) RelayDeleteSecret(request *message.Request, reply *message.Reply)
 	log.Printf("Node %d deleted secret [%s] (replica) successfully!\n", n.Pid, keyToDelete)
 	replicationFactor--
 	if replicationFactor > 0 {
-		go n.relaySecretDeletion(replicationFactor, keyToDelete, relayNodes)
+		err := n.relaySecretDeletion(replicationFactor, keyToDelete, relayNodes)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

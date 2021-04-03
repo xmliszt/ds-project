@@ -31,7 +31,10 @@ func main() {
 		if nodeID < 1 {
 			log.Fatalln("Node number must be larger than 0!")
 		}
-		file.CreateNodeStoragePath(nodeID)
+		err := file.CreateNodeStoragePath(nodeID)
+		if err != nil {
+			log.Fatal(err)
+		}
 		log.Printf("Node %d start!\n", nodeID)
 		node.Start(nodeID)
 	}

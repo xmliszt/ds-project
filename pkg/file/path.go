@@ -16,12 +16,18 @@ func CreateStoragePath() error {
 
 	nodeStoragePath := filepath.Join(cwd, "nodeStorage")
 	if _, err := os.Stat(nodeStoragePath); os.IsNotExist(err) {
-		os.Mkdir(nodeStoragePath, 0777)
+		err := os.Mkdir(nodeStoragePath, 0777)
+		if err != nil {
+			return err
+		}
 	}
 
 	userPath := filepath.Join(cwd, "nodeStorage", "user")
 	if _, err := os.Stat(userPath); os.IsNotExist(err) {
-		os.Mkdir(userPath, 0777)
+		err := os.Mkdir(userPath, 0777)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -36,12 +42,18 @@ func CreateNodeStoragePath(nodeID int) error {
 
 	nodeStoragePath := filepath.Join(cwd, "nodeStorage")
 	if _, err := os.Stat(nodeStoragePath); os.IsNotExist(err) {
-		os.Mkdir(nodeStoragePath, 0777)
+		err := os.Mkdir(nodeStoragePath, 0777)
+		if err != nil {
+			return err
+		}
 	}
 
 	storagePath := filepath.Join(cwd, "nodeStorage", fmt.Sprintf("node%d", nodeID))
 	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
-		os.Mkdir(storagePath, 0777)
+		err := os.Mkdir(storagePath, 0777)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
