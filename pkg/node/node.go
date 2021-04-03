@@ -11,7 +11,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
-	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/message"
 	"github.com/xmliszt/e-safe/pkg/secret"
 	"github.com/xmliszt/e-safe/util"
@@ -46,8 +45,6 @@ func Start(nodeID int) {
 		log.Fatal(err)
 	}
 
-	router := api.GetRouter()
-
 	node := &Node{
 		IsCoordinator:       false,
 		Pid:                 nodeID,
@@ -55,8 +52,10 @@ func Start(nodeID int) {
 		VirtualNodeLocation: make([]int, 0),
 		VirtualNodeMap:      make(map[int]string),
 		HeartBeatTable:      make(map[int]bool),
-		Router:              router,
 	}
+
+	router := node.getRouter()
+	node.Router = router
 
 	err = node.signalNodeStart() // Send start signal to Locksmith
 	if err != nil {
