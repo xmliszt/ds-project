@@ -3,6 +3,7 @@ package file
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"os"
 )
 
@@ -30,6 +31,15 @@ func ReadUsersFile() (map[string]interface{}, error) {
 		jsonFile, osErr = os.Create(userFilePath)
 		if osErr != nil {
 			return nil, osErr
+		}
+		file, marshallError := json.MarshalIndent(map[string]interface{}{}, "", " ")
+		if marshallError != nil {
+			return nil, marshallError
+		}
+
+		var writeError = ioutil.WriteFile(userFilePath, file, 0644)
+		if writeError != nil {
+			return nil, writeError
 		}
 	} else {
 		jsonFile, osErr = os.Open(userFilePath)
@@ -60,6 +70,7 @@ func ReadDataFile(pid int) (map[string]interface{}, error) {
 
 	filePath, err := GetNodeFilePath(pid)
 	if err != nil {
+		log.Println("FILE ERROR")
 		return nil, err
 	}
 
@@ -71,6 +82,15 @@ func ReadDataFile(pid int) (map[string]interface{}, error) {
 		if osErr != nil {
 			return nil, osErr
 		}
+		file, marshallError := json.MarshalIndent(map[string]interface{}{}, "", " ")
+		if marshallError != nil {
+			return nil, marshallError
+		}
+
+		var writeError = ioutil.WriteFile(filePath, file, 0644)
+		if writeError != nil {
+			return nil, writeError
+		}
 	} else {
 		jsonFile, osErr = os.Open(filePath)
 		if osErr != nil {
@@ -79,6 +99,7 @@ func ReadDataFile(pid int) (map[string]interface{}, error) {
 	}
 
 	if osErr != nil {
+		log.Println("OS ERROR")
 		return nil, osErr
 	}
 
@@ -86,6 +107,7 @@ func ReadDataFile(pid int) (map[string]interface{}, error) {
 
 	byteValue, readAllError := ioutil.ReadAll(jsonFile)
 	if readAllError != nil {
+		log.Println("READ ALL ERROR")
 		return nil, readAllError
 	}
 

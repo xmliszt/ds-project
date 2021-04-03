@@ -29,6 +29,7 @@ type ConfigNode struct {
 	HeartbeatInterval          int `yaml:"HeartbeatInterval"`
 	CoordinatorMonitorInterval int `yaml:"CoordinatorMonitorInterval"`
 	VirtualNodesCount          int `yaml:"VirtualNodesCount"`
+	ReplicationFactor          int `yaml:"ReplicationFactor"`
 }
 
 // LoadConfig loads the config from YAML file and return the config object
