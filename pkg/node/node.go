@@ -183,7 +183,7 @@ func (n *Node) startRouter() {
 	}
 	err = n.Router.Start(fmt.Sprintf(":%d", config.ConfigServer.Port))
 	if err != nil {
-		// log.Printf("Node %d REST server closed!\n", n.Pid)
+		log.Println(err)
 	}
 }
 
