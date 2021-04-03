@@ -1,4 +1,4 @@
-package api
+package node
 
 import (
 	"fmt"
@@ -7,15 +7,16 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
+	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/secret"
 	"github.com/xmliszt/e-safe/pkg/user"
 )
 
 // Put a secret
-func PutSecret(ctx echo.Context) error {
+func (n *Node) putSecret(ctx echo.Context) error {
 	secret := new(secret.Secret)
 	if err := ctx.Bind(secret); err != nil {
-		return ctx.JSON(http.StatusBadRequest, &Response{
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -26,7 +27,7 @@ func PutSecret(ctx echo.Context) error {
 }
 
 // Get a secret - deprecated
-func GetSecret(ctx echo.Context) error {
+func (n *Node) getSecret(ctx echo.Context) error {
 	token := ctx.Get("user").(*jwt.Token)
 	claims := token.Claims.(jwt.MapClaims)
 
@@ -34,7 +35,7 @@ func GetSecret(ctx echo.Context) error {
 
 	alias := ctx.QueryParam("alias")
 	if len(alias) < 1 {
-		return ctx.JSON(http.StatusBadRequest, &Response{
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   "Unknown URL params. 'alias' is not defined!",
 			Data:    nil,
@@ -44,14 +45,14 @@ func GetSecret(ctx echo.Context) error {
 	// Test a sample secret
 	secret, err := secret.GetSecret(1, "126")
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &Response{
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
 		})
 	}
 	if role > secret.Role {
-		return ctx.JSON(http.StatusUnauthorized, &Response{
+		return ctx.JSON(http.StatusUnauthorized, &api.Response{
 			Success: false,
 			Error:   "Your role is too low for this information!",
 			Data: &user.User{
@@ -60,7 +61,7 @@ func GetSecret(ctx echo.Context) error {
 			},
 		})
 	}
-	return ctx.JSON(http.StatusOK, &Response{
+	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
 		Data: []interface{}{
 			secret,
@@ -69,10 +70,10 @@ func GetSecret(ctx echo.Context) error {
 }
 
 // Delete a secret
-func DeleteSecret(ctx echo.Context) error {
+func (n *Node) deleteSecret(ctx echo.Context) error {
 	alias := ctx.QueryParam("alias")
 	if len(alias) < 1 {
-		return ctx.JSON(http.StatusBadRequest, &Response{
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   "Unknown URL params. 'alias' is not defined!",
 			Data:    nil,
@@ -81,19 +82,19 @@ func DeleteSecret(ctx echo.Context) error {
 	// Handle delete a secret
 	err := secret.DeleteSecret(1, "131")
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &Response{
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
 		})
 	}
-	return ctx.JSON(http.StatusOK, &Response{
+	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
 	})
 }
 
 // Get all secrets under a role
-func GetAllSecrets(ctx echo.Context) error {
+func (n *Node) getAllSecrets(ctx echo.Context) error {
 	token := ctx.Get("user").(*jwt.Token)
 	claims := token.Claims.(jwt.MapClaims)
 
@@ -102,7 +103,7 @@ func GetAllSecrets(ctx echo.Context) error {
 	fmt.Println("User role is: ", role)
 
 	// Handle get all secrets
-	return ctx.JSON(http.StatusOK, &Response{
+	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
 		Error:   "",
 		Data: map[string]interface{}{

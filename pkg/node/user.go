@@ -1,4 +1,4 @@
-package api
+package node
 
 import (
 	"crypto/subtle"
@@ -8,14 +8,15 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
+	"github.com/xmliszt/e-safe/pkg/api"
 	"github.com/xmliszt/e-safe/pkg/user"
 )
 
 // User log in - return JWT token for authentication
-func LogIn(ctx echo.Context) error {
+func (n *Node) logIn(ctx echo.Context) error {
 	u := new(user.User)
 	if err := ctx.Bind(u); err != nil {
-		return ctx.JSON(http.StatusBadRequest, &Response{
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -38,14 +39,14 @@ func LogIn(ctx echo.Context) error {
 
 				t, err := token.SignedString([]byte("secret"))
 				if err != nil {
-					return ctx.JSON(http.StatusBadRequest, &Response{
+					return ctx.JSON(http.StatusBadRequest, &api.Response{
 						Success: false,
 						Error:   err.Error(),
 						Data:    nil,
 					})
 				}
 
-				return ctx.JSON(http.StatusOK, &Response{
+				return ctx.JSON(http.StatusOK, &api.Response{
 					Success: true,
 					Error:   "",
 					Data:    t,
@@ -54,17 +55,17 @@ func LogIn(ctx echo.Context) error {
 		}
 	}
 
-	return ctx.JSON(http.StatusUnauthorized, &Response{
+	return ctx.JSON(http.StatusUnauthorized, &api.Response{
 		Success: false,
 		Error:   "Unauthorised",
 	})
 }
 
 // Create a user - Sign up
-func Register(ctx echo.Context) error {
+func (n *Node) register(ctx echo.Context) error {
 	user := new(user.User)
 	if err := ctx.Bind(user); err != nil {
-		return ctx.JSON(http.StatusBadRequest, &Response{
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
