@@ -1,11 +1,9 @@
 Server:
   Host: localhost
   Port: 8080
+Locksmith:
+  Port: 5000
 Node:
-  Number: 5 # Number of Nodes to initialize by Locksmith Server
   HeartbeatInterval: 2 # check heartbeat every n seconds
+  CoordinatorMonitorInterval: 1 # check and update coordinator every n seconds
   VirtualNodesCount: 3 # Number of virtual nodes for each node
-Timeout:
-  HeartbeatTimeout: 8 # in seconds, if after this duration still do not receive heartbeat reply, deem the node as dead
-  NodeCreationTimeout: 10 # in seconds, resume heartbeat checking for this node after this timeout over
-
