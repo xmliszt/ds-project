@@ -2,8 +2,11 @@ package node
 
 import (
 	"log"
+	"strconv"
 
+	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/pkg/secret"
 )
 
 // UpdateRpcMap updates node's RPC Map
@@ -44,5 +47,64 @@ func (n *Node) UpdateVirtualNodes(request *message.Request, reply *message.Reply
 	n.VirtualNodeLocation = locations.([]int)
 	n.VirtualNodeMap = virtualNode.(map[int]string)
 	log.Printf("Node %d updated virtual nodes: %v | %+v\n", n.Pid, n.VirtualNodeLocation, n.VirtualNodeMap)
+	return nil
+}
+
+// DeleteSecret deletes a secret - this is for owner node
+func (n *Node) DeleteSecret(request *message.Request, reply *message.Reply) error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+	replicationFactor := config.ConfigNode.ReplicationFactor
+	payload := request.Payload.(map[string]interface{})
+	keyToDelete := strconv.Itoa(payload["key"].(int))
+	myLocation := payload["location"].(int)
+	err = secret.UpdateSecret(n.Pid, keyToDelete, nil)
+	if err != nil {
+		return err
+	}
+	// get the next three locations of replicas
+	relayVirtualNodes, err := n.getRelayVirtualNodes(myLocation)
+	if err != nil {
+		return err
+	}
+	// relay deletion
+	err = n.relaySecretDeletion(replicationFactor, keyToDelete, relayVirtualNodes)
+	if err != nil {
+		return err
+	}
+
+	*reply = message.Reply{
+		From:    n.Pid,
+		To:      request.From,
+		ReplyTo: request.Code,
+		Payload: map[string]interface{}{
+			"success": true,
+		},
+	}
+
+	log.Printf("Node %d deleted secret [%s] successfully!\n", n.Pid, keyToDelete)
+	return nil
+}
+
+// RelayDeleteSecret deletes a copy of the secret
+func (n *Node) RelayDeleteSecret(request *message.Request, reply *message.Reply) error {
+	payload := request.Payload.(map[string]interface{})
+	replicationFactor := payload["rf"].(int)
+	keyToDelete := payload["key"].(string)
+	relayNodes := payload["nodes"].([]int)
+	err := secret.UpdateSecret(n.Pid, keyToDelete, nil)
+	if err != nil {
+		return err
+	}
+	log.Printf("Node %d deleted secret [%s] (replica) successfully!\n", n.Pid, keyToDelete)
+	replicationFactor--
+	if replicationFactor > 0 {
+		err := n.relaySecretDeletion(replicationFactor, keyToDelete, relayNodes)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

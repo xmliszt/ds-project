@@ -13,6 +13,8 @@ const (
 	CREATE_VIRTUAL_NODE    = 5
 	UPDATE_VIRTUAL_NODES   = 6
 	UPDATE_RPC_MAP         = 7
+	DELETE_SECRET          = 12
+	RELAY_DELETE_SECRET    = 13
 )
 
 type Reply struct {
