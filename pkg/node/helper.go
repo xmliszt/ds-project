@@ -2,7 +2,6 @@ package node
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -44,7 +43,6 @@ func (n *Node) getRelayVirtualNodes(startLocation int) ([]int, error) {
 	replicationFactor := config.ConfigNode.ReplicationFactor
 
 	// Check if physical node number is at least equal to replication factor
-	log.Println(n.HeartBeatTable)
 	aliveNodeCount := 0
 	for _, alive := range n.HeartBeatTable {
 		if alive {
