@@ -2,11 +2,9 @@ package file
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
-	"path/filepath"
-	"strconv"
 )
 
 // FileMethods contains all the methods associated with manipulating OS files
@@ -17,30 +15,37 @@ type FileMethods interface {
 	WriteDataFile()
 }
 
-func dataFilePathNode(nodePID int) (string, error) {
-	id := strconv.Itoa(nodePID)
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	dataFilePath := filepath.Join(cwd, "nodeStorage", "node"+id, "data.json")
-	return dataFilePath, nil
-}
-
 // ReadUsersFile returns all the information from the global users.json file
 // Code adapted from: https://tutorialedge.net/golang/parsing-json-with-golang/
 func ReadUsersFile() (map[string]interface{}, error) {
 
-	cwd, err := os.Getwd()
-	fmt.Println(cwd)
+	userFilePath, err := GetUserFilePath()
 	if err != nil {
 		return nil, err
 	}
-	userFilePath := filepath.Join(cwd, "users.json")
-	jsonFile, osErr := os.Open(userFilePath)
 
-	if osErr != nil { // if we os.Open returns an error then handle it
-		return nil, osErr
+	// if file not exists, create it
+	var jsonFile *os.File
+	var osErr error
+	if _, err := os.Stat(userFilePath); err != nil {
+		jsonFile, osErr = os.Create(userFilePath)
+		if osErr != nil {
+			return nil, osErr
+		}
+		file, marshallError := json.MarshalIndent(map[string]interface{}{}, "", " ")
+		if marshallError != nil {
+			return nil, marshallError
+		}
+
+		var writeError = ioutil.WriteFile(userFilePath, file, 0644)
+		if writeError != nil {
+			return nil, writeError
+		}
+	} else {
+		jsonFile, osErr = os.Open(userFilePath)
+		if osErr != nil {
+			return nil, osErr
+		}
 	}
 
 	defer jsonFile.Close()
@@ -54,7 +59,7 @@ func ReadUsersFile() (map[string]interface{}, error) {
 
 	// Unmarshal parses the byteValue array to a type defined by fileContents
 	marshalError := json.Unmarshal([]byte(byteValue), &fileContents)
-	if marshalError != nil { // if we os.Open returns an error then handle it
+	if marshalError != nil {
 		return nil, marshalError
 	}
 	return fileContents, nil
@@ -63,13 +68,38 @@ func ReadUsersFile() (map[string]interface{}, error) {
 // ReadDataFile returns all the information from the data.json of the respective node's local file
 func ReadDataFile(pid int) (map[string]interface{}, error) {
 
-	filePath, err := dataFilePathNode(pid)
+	filePath, err := GetNodeFilePath(pid)
 	if err != nil {
+		log.Println("FILE ERROR")
 		return nil, err
 	}
-	jsonFile, osErr := os.Open(filePath)
+
+	// if file not exists, create it
+	var jsonFile *os.File
+	var osErr error
+	if _, err := os.Stat(filePath); err != nil {
+		jsonFile, osErr = os.Create(filePath)
+		if osErr != nil {
+			return nil, osErr
+		}
+		file, marshallError := json.MarshalIndent(map[string]interface{}{}, "", " ")
+		if marshallError != nil {
+			return nil, marshallError
+		}
+
+		var writeError = ioutil.WriteFile(filePath, file, 0644)
+		if writeError != nil {
+			return nil, writeError
+		}
+	} else {
+		jsonFile, osErr = os.Open(filePath)
+		if osErr != nil {
+			return nil, osErr
+		}
+	}
 
 	if osErr != nil {
+		log.Println("OS ERROR")
 		return nil, osErr
 	}
 
@@ -77,6 +107,7 @@ func ReadDataFile(pid int) (map[string]interface{}, error) {
 
 	byteValue, readAllError := ioutil.ReadAll(jsonFile)
 	if readAllError != nil {
+		log.Println("READ ALL ERROR")
 		return nil, readAllError
 	}
 
@@ -109,12 +140,10 @@ func WriteUsersFile(addUsers map[string]interface{}) error {
 
 	}
 
-	cwd, err := os.Getwd()
-	fmt.Println(cwd)
+	userFilePath, err := GetUserFilePath()
 	if err != nil {
 		return err
 	}
-	userFilePath := filepath.Join(cwd, "users.json")
 	var writeError = ioutil.WriteFile(userFilePath, file, 0644)
 	if writeError != nil {
 		return writeError
@@ -125,7 +154,7 @@ func WriteUsersFile(addUsers map[string]interface{}) error {
 // WriteDataFile taks in the variable with map type then update the user file
 func WriteDataFile(pid int, addData map[string]interface{}) error {
 
-	filePath, err := dataFilePathNode(pid)
+	filePath, err := GetNodeFilePath(pid)
 	if err != nil {
 		return err
 	}
@@ -154,8 +183,7 @@ func WriteDataFile(pid int, addData map[string]interface{}) error {
 // OverwriteDatafromFile taks in the variable with map type then update the user file
 func OverwriteDataFile(pid int, addData map[string]interface{}) error {
 
-	filePath, err := dataFilePathNode(pid)
-
+	filePath, err := GetNodeFilePath(pid)
 	if err != nil {
 		return err
 	}
