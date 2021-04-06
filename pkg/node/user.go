@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/subtle"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -75,10 +76,29 @@ func (n *Node) register(ctx echo.Context) error {
 			Data:    nil,
 		})
 	}
+	// Check if user already exist
+	users, err := user.GetUsers()
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	for _, user := range users {
+		if newUser.Username == user.Username {
+			return ctx.JSON(http.StatusConflict, &api.Response{
+				Success: false,
+				Error:   fmt.Sprintf("username [%s] already exists", newUser.Username),
+				Data:    nil,
+			})
+		}
+	}
+
 	// Handle user registration
 	config, err := config.GetConfig()
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -93,7 +113,7 @@ func (n *Node) register(ctx echo.Context) error {
 	// Encrypt Password
 	cipher, err := util.Encrypt(key, pwd)
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -110,7 +130,7 @@ func (n *Node) register(ctx echo.Context) error {
 	var reply message.Reply
 	err = message.SendMessage(n.RpcMap[0], "LockSmith.AcquireUserLock", request, &reply)
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -118,7 +138,7 @@ func (n *Node) register(ctx echo.Context) error {
 	}
 	userIDHash, err := util.GetHash(newUser.Username)
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -126,13 +146,28 @@ func (n *Node) register(ctx echo.Context) error {
 	}
 	userIDInt := int(userIDHash)
 	userID := strconv.Itoa(userIDInt)
+	release := &message.Request{
+		From:    n.Pid,
+		To:      0,
+		Code:    message.RELEASE_USER_LOCK,
+		Payload: nil,
+	}
+	reply = message.Reply{}
 	err = user.CreateUser(newUser, userID)
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		err = message.SendMessage(n.RpcMap[0], "LockSmith.ReleaseUserLock", release, &reply)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
 		})
+	}
+	err = message.SendMessage(n.RpcMap[0], "LockSmith.ReleaseUserLock", release, &reply)
+	if err != nil {
+		log.Fatal(err)
 	}
 	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,

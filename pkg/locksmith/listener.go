@@ -58,13 +58,24 @@ func (locksmith *LockSmith) AcquireUserLock(request *message.Request, reply *mes
 	locksmith.RequestQueue = append(locksmith.RequestQueue, requestNodeID)
 	for {
 		if locksmith.RequestQueue[0] == requestNodeID {
-			locksmith.RequestQueue = locksmith.RequestQueue[1:]
 			break
 		}
 	}
 	*reply = message.Reply{
 		From:    locksmith.Pid,
 		To:      requestNodeID,
+		ReplyTo: request.Code,
+		Payload: nil,
+	}
+	return nil
+}
+
+// ReleaseUserLock pop the top request from the queue
+func (locksmith *LockSmith) ReleaseUserLock(request *message.Request, reply *message.Reply) error {
+	locksmith.RequestQueue = locksmith.RequestQueue[1:]
+	*reply = message.Reply{
+		From:    locksmith.Pid,
+		To:      request.From,
 		ReplyTo: request.Code,
 		Payload: nil,
 	}
