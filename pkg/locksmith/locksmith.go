@@ -85,6 +85,10 @@ func (locksmith *LockSmith) checkHeartbeat() {
 				// Node is down! If heartbeat table shows previously alive
 				if locksmith.HeartBeatTable[pid] {
 					locksmith.HeartBeatTable[pid] = false
+					// if happened to be the coordinator
+					if locksmith.Coordinator == pid {
+						locksmith.Coordinator = 0 // reset coordinator
+					}
 					// Remove virtual nodes
 					err := locksmith.removeVirtualNodes(pid)
 					if err != nil {
