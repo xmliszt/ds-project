@@ -35,7 +35,7 @@ func encodeUser(data interface{}) (*User, error) {
 	return user, nil
 }
 
-func decodeUser(user User) interface{} {
+func decodeUser(user *User) interface{} {
 	var r interface{} = user
 	return r
 }
@@ -62,7 +62,7 @@ func GetUser(username string) (*User, error) {
 }
 
 // CreateUser creates a user based on the User structure provided
-func CreateUser(user User, userID string) error {
+func CreateUser(user *User, userID string) error {
 	newUserVal := decodeUser(user)
 	newUser := map[string]interface{}{userID: newUserVal}
 	fileError := file.WriteUsersFile(newUser)

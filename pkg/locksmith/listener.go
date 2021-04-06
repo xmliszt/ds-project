@@ -50,3 +50,23 @@ func (locksmith *LockSmith) CreateVirtualNodes(request *message.Request, reply *
 	}
 	return nil
 }
+
+// AcquireUserLock puts the request into the queue and serves the request one by one in FIFO order
+func (locksmith *LockSmith) AcquireUserLock(request *message.Request, reply *message.Reply) error {
+	requestNodeID := request.From
+	// Add request to queue
+	locksmith.RequestQueue = append(locksmith.RequestQueue, requestNodeID)
+	for {
+		if locksmith.RequestQueue[0] == requestNodeID {
+			locksmith.RequestQueue = locksmith.RequestQueue[1:]
+			break
+		}
+	}
+	*reply = message.Reply{
+		From:    locksmith.Pid,
+		To:      requestNodeID,
+		ReplyTo: request.Code,
+		Payload: nil,
+	}
+	return nil
+}

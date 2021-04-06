@@ -20,6 +20,7 @@ type LockSmith struct {
 	HeartBeatTable      map[int]bool
 	VirtualNodeLocation []int
 	VirtualNodeMap      map[int]string
+	RequestQueue        []int // Request queue for granting lock for accessing user.json, an array of nodeID
 }
 
 // Start is the main function that starts the entire program
@@ -45,6 +46,7 @@ func Start() {
 		VirtualNodeLocation: make([]int, 0),
 		VirtualNodeMap:      make(map[int]string),
 		HeartBeatTable:      make(map[int]bool),
+		RequestQueue:        make([]int, 0),
 	}
 
 	// Populate each node's RPC listening addresses

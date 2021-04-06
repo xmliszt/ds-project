@@ -17,8 +17,9 @@ type Config struct {
 }
 
 type ConfigServer struct {
-	Host string `yaml:"Host"`
-	Port int    `yaml:"Port"`
+	Secret string `yaml:"Secret"`
+	Host   string `yaml:"Host"`
+	Port   int    `yaml:"Port"`
 }
 
 type ConfigLocksmith struct {

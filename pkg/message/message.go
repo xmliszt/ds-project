@@ -15,6 +15,8 @@ const (
 	UPDATE_RPC_MAP         = 7
 	DELETE_SECRET          = 12
 	RELAY_DELETE_SECRET    = 13
+	ACQUIRE_USER_LOCK      = 14
+	RELEASE_USER_LOCK      = 15
 )
 
 type Reply struct {

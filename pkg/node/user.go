@@ -4,12 +4,16 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
+	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/api"
+	"github.com/xmliszt/e-safe/pkg/message"
 	"github.com/xmliszt/e-safe/pkg/user"
+	"github.com/xmliszt/e-safe/util"
 )
 
 // User log in - return JWT token for authentication
@@ -63,8 +67,8 @@ func (n *Node) logIn(ctx echo.Context) error {
 
 // Create a user - Sign up
 func (n *Node) register(ctx echo.Context) error {
-	user := new(user.User)
-	if err := ctx.Bind(user); err != nil {
+	newUser := new(user.User)
+	if err := ctx.Bind(newUser); err != nil {
 		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   err.Error(),
@@ -72,5 +76,65 @@ func (n *Node) register(ctx echo.Context) error {
 		})
 	}
 	// Handle user registration
-	return ctx.String(http.StatusOK, fmt.Sprintf("Register a new user: Username: %s, Password: %s, Role: %d", user.Username, user.Password, user.Role))
+	config, err := config.GetConfig()
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	var key []byte = make([]byte, 32)
+	var pwd []byte
+	keyStr := config.ConfigServer.Secret
+	copy(key, []byte(keyStr))
+	pwdStr := newUser.Password
+	pwd = []byte(pwdStr)
+	// Encrypt Password
+	cipher, err := util.Encrypt(key, pwd)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	newUser.Password = string(cipher)
+	// Contact Locksmith for lock - Centralized Server Locking
+	request := &message.Request{
+		From:    n.Pid,
+		To:      0,
+		Code:    message.ACQUIRE_USER_LOCK,
+		Payload: nil,
+	}
+	var reply message.Reply
+	err = message.SendMessage(n.RpcMap[0], "LockSmith.AcquireUserLock", request, &reply)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	userIDHash, err := util.GetHash(newUser.Username)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	userIDInt := int(userIDHash)
+	userID := strconv.Itoa(userIDInt)
+	err = user.CreateUser(newUser, userID)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	return ctx.JSON(http.StatusOK, &api.Response{
+		Success: true,
+	})
 }
