@@ -2,6 +2,7 @@ package node
 
 import (
 	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,42 +29,122 @@ func (n *Node) logIn(ctx echo.Context) error {
 		})
 	}
 
+	// Contact Locksmith for lock - Centralized Server Locking
+	request := &message.Request{
+		From:    n.Pid,
+		To:      0,
+		Code:    message.ACQUIRE_USER_LOCK,
+		Payload: nil,
+	}
+	var reply message.Reply
+	err := message.SendMessage(n.RpcMap[0], "LockSmith.AcquireUserLock", request, &reply)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+
+	userIDHash, err := util.GetHash(u.Username)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	userIDInt := int(userIDHash)
+	userID := strconv.Itoa(userIDInt)
+	release := &message.Request{
+		From:    n.Pid,
+		To:      0,
+		Code:    message.RELEASE_USER_LOCK,
+		Payload: nil,
+	}
+	reply = message.Reply{}
+
+	// Get users and check password
 	users, userErr := user.GetUsers()
 	if userErr != nil {
-		return userErr
-	}
-
-	for _, user := range users {
-		if subtle.ConstantTimeCompare([]byte(user.Username), []byte(u.Username)) == 1 {
-			if subtle.ConstantTimeCompare([]byte(user.Password), []byte(u.Password)) == 1 {
-				token := jwt.New(jwt.SigningMethodHS256)
-				claims := token.Claims.(jwt.MapClaims)
-				claims["username"] = user.Username
-				claims["role"] = fmt.Sprintf("%d", user.Role)
-				claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
-
-				t, err := token.SignedString([]byte("secret"))
-				if err != nil {
-					return ctx.JSON(http.StatusBadRequest, &api.Response{
-						Success: false,
-						Error:   err.Error(),
-						Data:    nil,
-					})
-				}
-
-				return ctx.JSON(http.StatusOK, &api.Response{
-					Success: true,
-					Error:   "",
-					Data:    t,
-				})
-			}
+		err := message.SendMessage(n.RpcMap[0], "LockSmith.ReleaseUserLock", release, &reply)
+		if err != nil {
+			log.Fatal(err)
 		}
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   userErr.Error(),
+			Data:    nil,
+		})
 	}
 
-	return ctx.JSON(http.StatusUnauthorized, &api.Response{
-		Success: false,
-		Error:   "Unauthorised",
-	})
+	err = message.SendMessage(n.RpcMap[0], "LockSmith.ReleaseUserLock", release, &reply)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	config, err := config.GetConfig()
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	if _, ok := users[userID]; !ok {
+		return ctx.JSON(http.StatusNotFound, &api.Response{
+			Success: false,
+			Error:   "Username does not exist. Please register first!",
+		})
+	}
+	user := users[userID]
+	cipher, err := hex.DecodeString(user.Password)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+	var key []byte = make([]byte, 32)
+	keyStr := config.ConfigServer.Secret
+	copy(key, []byte(keyStr))
+	password, err := util.Decrypt(key, cipher)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+
+	if subtle.ConstantTimeCompare(password, []byte(u.Password)) == 1 {
+		token := jwt.New(jwt.SigningMethodHS256)
+		claims := token.Claims.(jwt.MapClaims)
+		claims["username"] = user.Username
+		claims["role"] = fmt.Sprintf("%d", user.Role)
+		claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+
+		t, err := token.SignedString([]byte("secret"))
+		if err != nil {
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
+				Success: false,
+				Error:   err.Error(),
+				Data:    nil,
+			})
+		}
+
+		return ctx.JSON(http.StatusOK, &api.Response{
+			Success: true,
+			Error:   "",
+			Data:    t,
+		})
+	} else {
+		return ctx.JSON(http.StatusUnauthorized, &api.Response{
+			Success: false,
+			Error:   "Unauthorised. Wrong password!",
+		})
+	}
 }
 
 // Create a user - Sign up
@@ -119,7 +200,7 @@ func (n *Node) register(ctx echo.Context) error {
 			Data:    nil,
 		})
 	}
-	newUser.Password = string(cipher)
+	newUser.Password = hex.EncodeToString(cipher)
 	// Contact Locksmith for lock - Centralized Server Locking
 	request := &message.Request{
 		From:    n.Pid,
