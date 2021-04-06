@@ -66,3 +66,12 @@ func (n *Node) getRelayVirtualNodes(startLocation int) ([]int, error) {
 	}
 	return relayVirtualNodes, nil
 }
+
+// getLocationFromHash gets the next n virtual nodes (n: replication factor) from
+// func (n *Node) getLocationFromHash(hashValue int) {
+// 	uHashedValue := util.StringHashToUint(string(hashValue));
+// 	vNodeName := util.MapHashToVNode(n.VirtualNodeMap, n.VirtualNodeLocation, uHashedValue)
+// 	nPid := util.NodePidFromVNode(vNodeName)
+// 	ret, err := n.getRelayVirtualNodes(nPid)
+// 	return ret, err
+// }

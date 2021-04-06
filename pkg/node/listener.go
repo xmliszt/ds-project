@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/xmliszt/e-safe/config"
-	"github.com/xmliszt/e-safe/pkg/file"
 	"github.com/xmliszt/e-safe/pkg/message"
 	"github.com/xmliszt/e-safe/pkg/secret"
 	"github.com/xmliszt/e-safe/util"
@@ -68,25 +67,53 @@ func (n *Node) StrictReplication(request *message.Request, reply *message.Reply)
 	// parse secret
 	payload := request.Payload.(map[string]interface{})
 	hashedValue := payload["hashedValue"].(string)
-	secret := payload["data"].(secret.Secret)
-
-	dataToWrite := map[string]interface{}{
-		hashedValue: secret,
-	}
+	secretToStore := payload["data"].(secret.Secret)
+	relayNodes := payload["relayNodes"].([]int)
+	rf := payload["rf"].(int)
 
 	// Write to respective node storage file
-	writeErr := file.WriteDataFile(n.Pid, dataToWrite)
+	writeErr := secret.PutSecret(n.Pid, hashedValue, &secretToStore)
 	if writeErr != nil {
 		log.Fatal("Data file write failed for node %d", n.Pid)
 	}
-
 	// nextVNode = util.MapHashToVNode()
 
-	nextVNodePid := util.FindNextVNode(n.Ring, n.VirtualNodeMap, n.VirtualNodeLocation, hashedValue)
-	vNodeActualPid := util.NodePidFromVNode(nextVNodePid)
+	// Send eventual replication message to neighbouring nodes
+	iHashedValue, _ := strconv.Atoi(hashedValue)
+	uHashedValue := uint32(iHashedValue)
+	nextVNodePid := util.FindNextVNode(n.Ring, n.VirtualNodeMap, n.VirtualNodeLocation, uHashedValue)
+	nextVNodeActualPid := util.NodePidFromVNode(nextVNodePid)
 	// Check if the next node is alive
-	if n.checkHeartbeat(vNodeActualPid) {
+	if n.checkHeartbeat(nextVNodeActualPid) {
+		n.sendEventualRepMsg(rf-1, hashedValue, secretToStore, relayNodes)
+	} else {
+		n.sendEventualRepMsg(rf-2, hashedValue, secretToStore, relayNodes)
+	}
+	// Reply here
+	*reply = message.Reply{
+		From:    n.Pid,
+		To:      request.From,
+		ReplyTo: request.Code,
+		Payload: map[string]interface{}{
+			"success": true,
+		},
+	}
+	return nil
+}
 
+// Performed by rf=1
+func (n *Node) PerformEventualReplication(request *message.Request, reply *message.Reply) error {
+	payload := request.Payload.(map[string]interface{})
+	hashedValue := payload["hashedValue"].(string)
+	secretToStore := payload["data"].(secret.Secret)
+	relayNodes := payload["relayNodes"].([]int)
+	rf := payload["rf"].(int)
+	err := secret.PutSecret(n.Pid, hashedValue, &secretToStore)
+	if err != nil {
+		return err
+	}
+	if rf > 0 {
+		n.sendEventualRepMsg(rf-1, hashedValue, secretToStore, relayNodes)
 	}
 	return nil
 }
@@ -148,4 +175,88 @@ func (n *Node) RelayDeleteSecret(request *message.Request, reply *message.Reply)
 			return err
 		}
 	}
+	return nil
+}
+
+func (n *Node) PerformStrictDown(request *message.Request, reply *message.Reply) error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+	replicationFactor := config.ConfigNode.ReplicationFactor
+	payload := request.Payload.(map[string]interface{})
+	keyToStore := strconv.Itoa(payload["key"].(int))
+	// Issue How to load a secret from the payload
+	valueToStore := payload["secret"].(secret.Secret)
+	// myLocation := payload["location"].(int)
+	relayNodes := payload["nodes"].([]int)
+
+	// Store
+	err = secret.PutSecret(n.Pid, keyToStore, &valueToStore)
+	if err != nil {
+		return err
+	}
+
+	// Relay Strict Consistency
+	err = n.sendEventualRepMsg(replicationFactor, keyToStore, valueToStore, relayNodes)
+	if err != nil {
+		return err
+	} else {
+		// ack back to the coord
+		*reply = message.Reply{
+			From:    n.Pid,
+			To:      request.From,
+			ReplyTo: request.Code,
+			Payload: map[string]interface{}{
+				"Strict Down excuted successful": true,
+			},
+		}
+	}
+	//log.Printf("Node %d deleted secret [%s] successfully!\n", n.Pid, keyToDelete)
+	return nil
+}
+
+// Take in list from Coordinator and trigger Store and Replicate processes.
+// Store data to itself and send message to next data on the list to conduct strict consistency
+func (n *Node) StoreAndReplicate(request *message.Request, reply *message.Reply) error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+	replicationFactor := config.ConfigNode.ReplicationFactor
+	payload := request.Payload.(map[string]interface{})
+	keyToStore := strconv.Itoa(payload["key"].(int))
+	// Issue How to load a secret from the payload
+	valueToStore := payload["secret"].(secret.Secret)
+	myLocation := payload["location"].(int)
+
+	// Store
+	err = secret.PutSecret(n.Pid, keyToStore, &valueToStore)
+	if err != nil {
+		return err
+	}
+
+	// get the next three locations of replicas
+	relayVirtualNodes, err := n.getRelayVirtualNodes(myLocation)
+	if err != nil {
+		return err
+	}
+
+	// Relay Strict Consistency
+	err = n.sendStrictRepMsg(replicationFactor, keyToStore, valueToStore, relayVirtualNodes)
+	if err != nil {
+		return err
+	} else {
+		// ack back to the coord
+		*reply = message.Reply{
+			From:    n.Pid,
+			To:      request.From,
+			ReplyTo: request.Code,
+			Payload: map[string]interface{}{
+				"success": true,
+			},
+		}
+	}
+	//log.Printf("Node %d deleted secret [%s] successfully!\n", n.Pid, keyToDelete)
+	return nil
 }
