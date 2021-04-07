@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"strconv"
 )
 
 // SliceRemoveInt removes an integer value from a slice of integer, if value does not exist, it will throw an error
@@ -61,24 +60,4 @@ func FindMax(array []int) int {
 		}
 	}
 	return max
-}
-
-// Find physical node int from virtual node string
-func GetPhysicalNode(vn string) (int, error) {
-	var sPhysicalNode string
-
-	for _, char := range vn {
-		if string(char) != "-" {
-			sPhysicalNode = sPhysicalNode + string(char)
-		} else {
-			break
-		}
-	}
-	PhysicalNode, err := strconv.Atoi(sPhysicalNode)
-
-	if err != nil {
-		return -1, err
-	}
-
-	return PhysicalNode, nil
 }

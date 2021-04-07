@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -77,4 +78,69 @@ func (n *Node) getRelayVirtualNodes(startLocation int) ([]int, error) {
 		idx++
 	}
 	return relayVirtualNodes, nil
+}
+
+// getReplicationLocations gets the locations of the virtual nodes which
+// are the owners of the secrets whose replicas are supposed to store in
+// this new born node
+func (n *Node) getReplicationLocations(location int) ([][]int, error) {
+	config, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([][]int, 0)
+	nodesVisited := make([]int, 0)
+
+	idx := n.getVirtualLocationIndex(location)
+
+	for {
+		if len(nodesVisited) >= config.ConfigNode.ReplicationFactor {
+			break
+		}
+		if idx == -1 {
+			idx = len(n.VirtualNodeLocation) - 1
+		}
+		var virtualNodeLoc int
+		var prevVirtualNodeLoc int
+
+		virtualNodeLoc = n.VirtualNodeLocation[idx]
+		if idx-1 < 0 {
+			prevVirtualNodeLoc = n.VirtualNodeLocation[len(n.VirtualNodeLocation)-int(math.Abs(float64(idx-1)))]
+		} else {
+			prevVirtualNodeLoc = n.VirtualNodeLocation[idx-1]
+		}
+
+		physicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[virtualNodeLoc])
+		if err != nil {
+			return nil, err
+		}
+		if !util.IntInSlice(nodesVisited, physicalNodeID) && physicalNodeID != n.Pid {
+			nodesVisited = append(nodesVisited, physicalNodeID)
+			res = append(res, []int{physicalNodeID, prevVirtualNodeLoc, virtualNodeLoc})
+		}
+		idx--
+	}
+
+	return res, nil
+}
+
+// Find physical node int from virtual node string
+func GetPhysicalNode(vn string) (int, error) {
+	var sPhysicalNode string
+
+	for _, char := range vn {
+		if string(char) != "-" {
+			sPhysicalNode = sPhysicalNode + string(char)
+		} else {
+			break
+		}
+	}
+	PhysicalNode, err := strconv.Atoi(sPhysicalNode)
+
+	if err != nil {
+		return -1, err
+	}
+
+	return PhysicalNode, nil
 }

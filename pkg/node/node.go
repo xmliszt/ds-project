@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"net/rpc"
 	"os"
@@ -109,9 +110,10 @@ func (n *Node) updateData() error {
 		var nextPhysicalNodeID int
 		var prevVirtualNodeLocation int
 
-		idx := n.getVirtualLocationIndex(location)
+		ownLocationIdx := n.getVirtualLocationIndex(location)
 
 		// Get the next physical node ID that is not myself
+		idx := ownLocationIdx + 1
 		for {
 			if idx == len(n.VirtualNodeLocation) {
 				idx = 0
@@ -125,24 +127,11 @@ func (n *Node) updateData() error {
 				idx++
 			} else {
 				nextPhysicalNodeID = physicalNodeID
-				break
-			}
-		}
-
-		// Get the previous physical node ID that is not myself
-		for {
-			if idx == -1 {
-				idx = len(n.VirtualNodeLocation) - 1
-			}
-			loc := n.VirtualNodeLocation[idx]
-			physicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[loc])
-			if err != nil {
-				return err
-			}
-			if physicalNodeID == n.Pid {
-				idx--
-			} else {
-				prevVirtualNodeLocation = loc
+				if ownLocationIdx-1 < 0 {
+					prevVirtualNodeLocation = n.VirtualNodeLocation[len(n.VirtualNodeLocation)-int(math.Abs(float64(ownLocationIdx-1)))]
+				} else {
+					prevVirtualNodeLocation = n.VirtualNodeLocation[ownLocationIdx-1]
+				}
 				break
 			}
 		}
@@ -175,6 +164,7 @@ func (n *Node) updateData() error {
 
 		// Get replica from previous nodes using RPC
 		replicationLocation, err := n.getReplicationLocations(location)
+		log.Printf("Previous nodes to contact: %v\n", replicationLocation)
 		if err != nil {
 			return err
 		}
@@ -191,12 +181,12 @@ func (n *Node) updateData() error {
 				},
 			}
 			var replicaSecretMigrationReply message.Reply
-			err = message.SendMessage(n.RpcMap[nextPhysicalNodeID], "Node.GetSecrets", replicaSecretMigrationRequest, &replicaSecretMigrationReply)
+			err = message.SendMessage(n.RpcMap[nodeID], "Node.GetSecrets", replicaSecretMigrationRequest, &replicaSecretMigrationReply)
 			if err != nil {
 				return err
 			}
 			fetchedReplicas := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
-			log.Printf("Node %d fetched replica secrets from Node %d: %v\n", n.Pid, nextPhysicalNodeID, fetchedReplicas)
+			log.Printf("Node %d fetched replica secrets from Node %d: %v\n", n.Pid, nodeID, fetchedReplicas)
 
 			// put secret to itself
 			for k, v := range fetchedReplicas {
@@ -208,55 +198,6 @@ func (n *Node) updateData() error {
 		}
 	}
 	return nil
-}
-
-// getReplicationLocations gets the locations of the virtual nodes which
-// are the owners of the secrets whose replicas are supposed to store in
-// this new born node
-func (n *Node) getReplicationLocations(location int) ([][]int, error) {
-	config, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([][]int, 0)
-	nodesVisited := make([]int, 0)
-	loc := util.GetIndex(n.VirtualNodeLocation, location)
-	var virtualNode string
-
-	for len(nodesVisited) <= config.ReplicationFactor {
-		if loc < 0 { // loop from the tail of the slice if index of location is less than replication factor
-			moduloLoc := (loc * -1) % len(n.VirtualNodeLocation)
-			virtualNode = n.VirtualNodeMap[n.VirtualNodeLocation[len(n.VirtualNodeLocation)-moduloLoc]]
-		} else {
-			virtualNode = n.VirtualNodeMap[n.VirtualNodeLocation[loc]]
-		}
-		physicalNode, err := util.GetPhysicalNode(virtualNode)
-		if err != nil {
-			return nil, err
-		}
-		if !util.IntInSlice(nodesVisited, physicalNode) {
-			nodesVisited = append(nodesVisited, physicalNode)
-			uvirtualNodeLoc, err := util.GetHash(virtualNode)
-			if err != nil {
-				return nil, err
-			}
-			virtualNodeLoc := int(uvirtualNodeLoc)
-			virtualNodeIdx := util.GetIndex(n.VirtualNodeLocation, virtualNodeLoc)
-			prevVirtualNodeIdx := virtualNodeIdx - 1
-			var prevVirtualNodeLoc int
-			if prevVirtualNodeIdx == -1 { // loop from the tail of the slice if index of location is less than replication factor
-				prevVirtualNodeLoc = n.VirtualNodeLocation[len(n.VirtualNodeLocation)-1]
-			} else {
-				prevVirtualNodeLoc = n.VirtualNodeLocation[prevVirtualNodeIdx]
-			}
-			slice := []int{physicalNode, prevVirtualNodeLoc, virtualNodeLoc}
-			res = append(res, slice)
-			loc -= 1
-		}
-	}
-
-	return res, nil
 }
 
 // signalNodeStart sends a signal to Locksmith server that the node has started
