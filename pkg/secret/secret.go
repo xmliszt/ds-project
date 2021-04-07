@@ -62,14 +62,18 @@ func GetSecrets(pid int, from int, to int) (map[string]*Secret, error) {
 		return nil, fileError
 	} else {
 		specificData := make(map[string]*Secret)
-		for dictKeyInt := from; dictKeyInt <= to; dictKeyInt++ {
-			stringKey := strconv.Itoa(dictKeyInt)
-			secretVal := allData[stringKey]
-			secret, err := encodeSecret(secretVal)
+		for key, secret := range allData {
+			keyInt, err := strconv.Atoi(key)
 			if err != nil {
 				return nil, err
 			}
-			specificData[stringKey] = secret
+			if keyInt >= from && keyInt <= to {
+				secret, err := encodeSecret(secret)
+				if err != nil {
+					return nil, err
+				}
+				specificData[key] = secret
+			}
 		}
 		return specificData, nil
 	}
