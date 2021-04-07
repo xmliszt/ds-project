@@ -40,8 +40,17 @@ func GetSecret(pid int, id string) (*Secret, error) {
 	if fileError != nil {
 		return nil, fileError
 	} else {
+		if len(allData) <= 0 {
+			return nil, fmt.Errorf("key for secret not available")
+		}
+		if _, ok := allData[id]; !ok {
+			return nil, fmt.Errorf("key for secret not available")
+		}
 		for key, val := range allData {
 			if key == id {
+				if val == nil {
+					return nil, fmt.Errorf("key for secret not available")
+				}
 				secret, err := encodeSecret(val)
 				if err != nil {
 					return nil, err
@@ -49,7 +58,7 @@ func GetSecret(pid int, id string) (*Secret, error) {
 				return secret, nil
 			}
 		}
-		unknownSecretIDError := errors.New("use	rname not available")
+		unknownSecretIDError := errors.New("key for secret not available")
 		return nil, unknownSecretIDError
 	}
 
@@ -62,14 +71,33 @@ func GetSecrets(pid int, from int, to int) (map[string]*Secret, error) {
 		return nil, fileError
 	} else {
 		specificData := make(map[string]*Secret)
-		for dictKeyInt := from; dictKeyInt <= to; dictKeyInt++ {
-			stringKey := strconv.Itoa(dictKeyInt)
-			secretVal := allData[stringKey]
-			secret, err := encodeSecret(secretVal)
+		for key, secretVal := range allData {
+			keyInt, err := strconv.Atoi(key)
 			if err != nil {
 				return nil, err
 			}
-			specificData[stringKey] = secret
+			// tail to head case
+			var secret *Secret
+			if from > to {
+				if (keyInt >= from && keyInt <= int(^uint32(0))) || (keyInt >= 0 && keyInt <= to) {
+					if keyInt >= from && keyInt <= to {
+						secret, err = encodeSecret(secretVal)
+						if err != nil {
+							return nil, err
+						}
+						specificData[key] = secret
+					}
+				}
+			} else {
+				if keyInt >= from && keyInt <= to {
+					secret, err = encodeSecret(secretVal)
+					if err != nil {
+						return nil, err
+					}
+					specificData[key] = secret
+				}
+			}
+
 		}
 		return specificData, nil
 	}
@@ -117,6 +145,29 @@ func UpdateSecret(pid int, key string, secret *Secret) error {
 	}
 	newSecret := map[string]interface{}{key: secretVal}
 	fileError = file.WriteDataFile(pid, newSecret)
+	if fileError != nil {
+		return fileError
+	}
+	return nil
+}
+
+// RemoveSecret is different than deletion, our "deletion" is defined
+// as simply 'update' the value of secret to be nil
+// RemoveSecret delete the entire entry from the data
+func RemoveSecret(pid int, key string) error {
+	allData, fileError := file.ReadDataFile(pid)
+	if fileError != nil {
+		return fileError
+	}
+	// check if the key exists in the data file
+	// if exist, overwrite
+	// if does not exist, throw error
+	if _, ok := allData[key]; !ok {
+		return fmt.Errorf("key [%s] does not exist", key)
+	}
+
+	delete(allData, key)
+	fileError = file.OverwriteDataFile(pid, allData)
 	if fileError != nil {
 		return fileError
 	}

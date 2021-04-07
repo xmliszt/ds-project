@@ -13,6 +13,7 @@ var (
 	rpcMap          = map[int]string{}
 	virtualNodeData = map[string]interface{}{}
 	secretType      = secret.Secret{}
+	secretsMap      = map[string]*secret.Secret{}
 )
 
 func Regsiter() {
@@ -20,4 +21,5 @@ func Regsiter() {
 	gob.Register(rpcMap)
 	gob.Register(virtualNodeData)
 	gob.Register(secretType)
+	gob.Register(secretsMap)
 }

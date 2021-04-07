@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"net/rpc"
 	"os"
@@ -70,6 +71,16 @@ func Start(nodeID int) {
 		log.Fatal(err)
 	}
 
+	// If the number of nodes present (excluding Locksmith) is greater than replication factor
+	// Then start data re-distribution
+	if len(node.RpcMap)-1 > config.ConfigNode.ReplicationFactor+1 {
+		log.Printf("Node %d starts data re-distribution!\n", node.Pid)
+		err := node.updateData() // Update data
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// Start RPC server
 	log.Printf("Node %d listening on: %v\n", node.Pid, address)
 	err = rpc.Register(node)
@@ -79,8 +90,125 @@ func Start(nodeID int) {
 	rpc.Accept(inbound)
 }
 
+// updataData grabs data from the next clockwise node
+// for the replicated data, it will grab from the previous nodes
+func (n *Node) updateData() error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+
+	// do for all virtual nodes
+	for i := 1; i <= config.VirtualNodesCount; i++ {
+		virtualNode := strconv.Itoa(n.Pid) + "-" + strconv.Itoa(i)
+		ulocation, e := util.GetHash(virtualNode)
+		location := int(ulocation)
+		if e != nil {
+			return e
+		}
+
+		var nextPhysicalNodeID int
+		var prevVirtualNodeLocation int
+
+		ownLocationIdx := n.getVirtualLocationIndex(location)
+		var nextVirtualNodeName string
+
+		// Get the next physical node ID that is not myself
+		idx := ownLocationIdx + 1
+		for {
+			if idx == len(n.VirtualNodeLocation) {
+				idx = 0
+			}
+			loc := n.VirtualNodeLocation[idx]
+			physicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[loc])
+			if err != nil {
+				return err
+			}
+			if physicalNodeID == n.Pid {
+				idx++
+			} else {
+				nextPhysicalNodeID = physicalNodeID
+				if ownLocationIdx-1 < 0 {
+					prevVirtualNodeLocation = n.VirtualNodeLocation[len(n.VirtualNodeLocation)-int(math.Abs(float64(ownLocationIdx-1)))]
+				} else {
+					prevVirtualNodeLocation = n.VirtualNodeLocation[ownLocationIdx-1]
+				}
+				nextVirtualNodeName = n.VirtualNodeMap[loc]
+				break
+			}
+		}
+
+		// grab original data from the next node
+		originalSecretMigrationRequest := &message.Request{
+			From: n.Pid,
+			To:   nextPhysicalNodeID,
+			Code: message.FETCH_ORIGINAL_SECRETS,
+			Payload: map[string]interface{}{
+				"range":  []int{prevVirtualNodeLocation, location},
+				"delete": true, // If true, the target node will delete the data after sending
+			},
+		}
+		var originalSecretMigrationReply message.Reply
+		err = message.SendMessage(n.RpcMap[nextPhysicalNodeID], "Node.GetSecrets", originalSecretMigrationRequest, &originalSecretMigrationReply)
+		if err != nil {
+			return err
+		}
+		fetchedSecrets := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
+		log.Printf("Virtual Node %s fetched original secrets from Virtual Node %s: %v\n", virtualNode, nextVirtualNodeName, fetchedSecrets)
+
+		// put secret to itself
+		for k, v := range fetchedSecrets {
+			err := secret.UpdateSecret(n.Pid, k, v)
+			if err != nil {
+				err := secret.PutSecret(n.Pid, k, v)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Get replica from previous nodes using RPC
+		replicationLocation, err := n.getReplicationLocations(location)
+		if err != nil {
+			return err
+		}
+		for _, slice := range replicationLocation {
+			nodeID, from, to := slice[0], slice[1], slice[2]
+
+			replicaSecretMigrationRequest := &message.Request{
+				From: n.Pid,
+				To:   nodeID,
+				Code: message.FETCH_REPLICA_SECRETS,
+				Payload: map[string]interface{}{
+					"range":  []int{from, to},
+					"delete": false, // if false, the target node will retain the data after sending
+				},
+			}
+			var replicaSecretMigrationReply message.Reply
+			err = message.SendMessage(n.RpcMap[nodeID], "Node.GetSecrets", replicaSecretMigrationRequest, &replicaSecretMigrationReply)
+			if err != nil {
+				return err
+			}
+			fetchedReplicas := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
+			log.Printf("Virtual Node %s fetched replica secrets from Virtual Node %s: %v\n", virtualNode, n.VirtualNodeMap[to], fetchedReplicas)
+
+			// put secret to itself
+			for k, v := range fetchedReplicas {
+				err := secret.UpdateSecret(n.Pid, k, v)
+				if err != nil {
+					err := secret.PutSecret(n.Pid, k, v)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // signalNodeStart sends a signal to Locksmith server that the node has started
-// it is for Locksmith server to respond with the current RPC map
+// it is for Locksmith server to respond with the current RPC map-
 func (n *Node) signalNodeStart() error {
 	config, err := config.GetConfig()
 	if err != nil {

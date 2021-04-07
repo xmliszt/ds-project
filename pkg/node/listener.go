@@ -73,17 +73,19 @@ func (n *Node) StrictReplication(request *message.Request, reply *message.Reply)
 	rf := payload["rf"].(int)
 
 	// Write to respective node storage file
-	writeErr := secret.PutSecret(n.Pid, hashedValue, &secretToStore)
+	writeErr := secret.UpdateSecret(n.Pid, hashedValue, &secretToStore)
 	if writeErr != nil {
-		log.Println("Error coming from write", writeErr)
-		log.Fatal("Data file write failed for node", n.Pid)
+		err := secret.PutSecret(n.Pid, hashedValue, &secretToStore)
+		if err != nil {
+			return err
+		}
 	}
 
 	nextVNodeLocation := relayNodes[rf-1]
 	nextVNodeName := n.VirtualNodeMap[nextVNodeLocation]
 	nextVNodeActualPid, err := getPhysicalNodeID(nextVNodeName)
 	if err != nil {
-		log.Println("Cannot find the nextVNodeActualPid")
+		return err
 	}
 
 	// Check if the next node is alive
@@ -117,9 +119,12 @@ func (n *Node) PerformEventualReplication(request *message.Request, reply *messa
 	secretToStore := payload["secret"].(secret.Secret)
 	relayNodes := payload["nodes"].([]int)
 	rf := payload["rf"].(int)
-	err := secret.PutSecret(n.Pid, hashedValue, &secretToStore)
+	err := secret.UpdateSecret(n.Pid, hashedValue, &secretToStore)
 	if err != nil {
-		return err
+		err := secret.PutSecret(n.Pid, hashedValue, &secretToStore)
+		if err != nil {
+			return err
+		}
 	}
 	if rf > 1 {
 		err := n.sendEventualRepMsg(rf-1, hashedValue, secretToStore, relayNodes)
@@ -147,6 +152,7 @@ func (n *Node) DeleteSecret(request *message.Request, reply *message.Reply) erro
 	}
 	// get the next three locations of replicas
 	relayVirtualNodes, err := n.getRelayVirtualNodes(myLocation)
+	log.Printf("Relay Virtual Nodes: %v\n", relayVirtualNodes)
 	if err != nil {
 		return err
 	}
@@ -190,6 +196,37 @@ func (n *Node) RelayDeleteSecret(request *message.Request, reply *message.Reply)
 	return nil
 }
 
+// GetSecrets gets the secrets from given range and send back
+func (n *Node) GetSecrets(request *message.Request, reply *message.Reply) error {
+	payload := request.Payload.(map[string]interface{})
+	fetchRange := payload["range"].([]int)
+	toDelete := payload["delete"].(bool)
+	from := fetchRange[0]
+	to := fetchRange[1]
+
+	secrets, err := secret.GetSecrets(n.Pid, from, to)
+	if err != nil {
+		return err
+	}
+	*reply = message.Reply{
+		From:    n.Pid,
+		To:      request.From,
+		ReplyTo: request.Code,
+		Payload: secrets,
+	}
+
+	if toDelete {
+		for key := range secrets {
+			err := secret.RemoveSecret(n.Pid, key)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (n *Node) PerformStrictDown(request *message.Request, reply *message.Reply) error {
 	config, err := config.GetConfig()
 	fmt.Println("start the strict down")
@@ -205,9 +242,12 @@ func (n *Node) PerformStrictDown(request *message.Request, reply *message.Reply)
 	relayNodes := payload["nodes"].([]int)
 
 	// Store
-	err = secret.PutSecret(n.Pid, keyToStore, &valueToStore)
+	err = secret.UpdateSecret(n.Pid, keyToStore, &valueToStore)
 	if err != nil {
-		return err
+		err := secret.PutSecret(n.Pid, keyToStore, &valueToStore)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Relay Strict Consistency
@@ -245,9 +285,12 @@ func (n *Node) StoreAndReplicate(request *message.Request, reply *message.Reply)
 	relayVirtualNodes := payload["nodes"].([]int)
 
 	// Store
-	err = secret.PutSecret(n.Pid, keyToStore, &valueToStore)
+	err = secret.UpdateSecret(n.Pid, keyToStore, &valueToStore)
 	if err != nil {
-		return err
+		err := secret.PutSecret(n.Pid, keyToStore, &valueToStore)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Relay Strict Consistency
@@ -273,8 +316,8 @@ func (n *Node) GetData(request *message.Request, reply *message.Reply) error {
 	payload := request.Payload.(map[string]interface{})
 	keyToSearch := payload["key"].(int)
 
-	retrievedSecret, err := secret.GetSecret(n.Pid,strconv.Itoa(keyToSearch))
-	if err != nil{
+	retrievedSecret, err := secret.GetSecret(n.Pid, strconv.Itoa(keyToSearch))
+	if err != nil {
 		log.Println("Unable to retrieve secret from file")
 		return err
 	}

@@ -15,3 +15,5 @@
 # vendor/
 
 nodeStorage/*
+
+node_modules

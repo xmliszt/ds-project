@@ -23,11 +23,13 @@ const (
 	ACK_STRICT_OWNER_DOWN  = 15 // ACK for STRICT_OWNER_DOWN
 	AID_RECOVERY           = 16 // All nodes conduct replication again
 	REQUST_DATA            = 17 // Newly revived node asks for it's original data
-	DELETE_SECRET          = 12
-	RELAY_DELETE_SECRET    = 13
-	ACQUIRE_USER_LOCK      = 14
-	RELEASE_USER_LOCK      = 15
-	GIVE_ME_DATA           = 16
+	DELETE_SECRET          = 18
+	RELAY_DELETE_SECRET    = 19
+	ACQUIRE_USER_LOCK      = 20
+	RELEASE_USER_LOCK      = 21
+	FETCH_ORIGINAL_SECRETS = 22
+	FETCH_REPLICA_SECRETS  = 23
+	GIVE_ME_DATA           = 24
 )
 
 type Reply struct {
