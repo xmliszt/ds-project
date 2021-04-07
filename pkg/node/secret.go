@@ -69,6 +69,14 @@ func (n *Node) putSecret(ctx echo.Context) error {
 	}
 
 	nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[vNodeLoc])
+	if err != nil {
+		// log.Fatal("Error when geting the list of virtual nodes for replication")
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
 	fmt.Println("this is the nextPhyscialNodeID", nextPhysicalNodeID)
 
 	nextPhysicalNodeRpc := n.RpcMap[nextPhysicalNodeID]
@@ -111,6 +119,14 @@ func (n *Node) putSecret(ctx echo.Context) error {
 
 		vNodeNameNextToOwner := n.VirtualNodeMap[vNodeNextToDeadOwner]
 		nextnextPhysicalNodeID, err := getPhysicalNodeID(vNodeNameNextToOwner)
+		if err != nil {
+			// log.Fatal("Error when geting the list of virtual nodes for replication")
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
+				Success: false,
+				Error:   err.Error(),
+				Data:    nil,
+			})
+		}
 
 		nextnextPhysicalNodeRpc := n.RpcMap[nextnextPhysicalNodeID]
 		err = message.SendMessage(nextnextPhysicalNodeRpc, "Node.PerformStrictDown", request, &reply)
@@ -121,7 +137,7 @@ func (n *Node) putSecret(ctx echo.Context) error {
 	}
 
 	payload := reply.Payload.(map[string]interface{})
-	if payload["success"].(bool) == true {
+	if payload["success"].(bool) {
 		return ctx.String(http.StatusOK, fmt.Sprintf("Putting secret: %+v...", recievingSecret))
 	} else {
 		return ctx.JSON(http.StatusInternalServerError, &api.Response{
@@ -130,17 +146,6 @@ func (n *Node) putSecret(ctx echo.Context) error {
 			Data:    nil,
 		})
 	}
-
-	// } else {
-	// Send store and replicate message to owner node
-
-	// Wait for reply from owner node
-	// Else send to next node
-	// Send strict down to next virtual node
-
-	// Wait for reply from next virtual node
-	return ctx.String(http.StatusOK, fmt.Sprintf("Putting secret: %+v...", recievingSecret))
-	// return nil;
 }
 
 // Get a secret - deprecated

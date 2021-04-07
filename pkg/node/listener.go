@@ -192,6 +192,7 @@ func (n *Node) RelayDeleteSecret(request *message.Request, reply *message.Reply)
 
 func (n *Node) PerformStrictDown(request *message.Request, reply *message.Reply) error {
 	config, err := config.GetConfig()
+	fmt.Println("start the strict down")
 	if err != nil {
 		return err
 	}
