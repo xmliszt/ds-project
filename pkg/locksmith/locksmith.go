@@ -6,10 +6,12 @@ import (
 	"net"
 	"net/rpc"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/util"
 )
 
 type LockSmith struct {
@@ -82,8 +84,19 @@ func (locksmith *LockSmith) checkHeartbeat() {
 			}
 			nodeClient, err := rpc.Dial("tcp", locksmith.RpcMap[pid])
 			if err != nil {
-				// Node is down!
-				locksmith.HeartBeatTable[pid] = false
+				// Node is down! If heartbeat table shows previously alive
+				if locksmith.HeartBeatTable[pid] {
+					locksmith.HeartBeatTable[pid] = false
+					// if happened to be the coordinator
+					if locksmith.Coordinator == pid {
+						locksmith.Coordinator = 0 // reset coordinator
+					}
+					// Remove virtual nodes
+					err := locksmith.removeVirtualNodes(pid)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
 			} else {
 				locksmith.HeartBeatTable[pid] = true
 				nodeClient.Close()
@@ -95,6 +108,47 @@ func (locksmith *LockSmith) checkHeartbeat() {
 		}
 		log.Println("Heartbeat Table: ", locksmith.HeartBeatTable)
 	}
+}
+
+// removeVirtualNodes removes the dead node's virtual node locations and map
+func (locksmith *LockSmith) removeVirtualNodes(nodeID int) error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+
+	virtualLocations := make([]int, 0)
+
+	for i := 1; i <= config.VirtualNodesCount; i++ {
+		virtualNode := strconv.Itoa(nodeID) + "-" + strconv.Itoa(i)
+		ulocation, e := util.GetHash(virtualNode)
+		location := int(ulocation)
+		if e != nil {
+			return e
+		}
+
+		virtualLocations = append(virtualLocations, location)
+	}
+
+	// Remove from map
+	for _, location := range virtualLocations {
+		delete(locksmith.VirtualNodeMap, location)
+	}
+
+	// Remove from location
+	newLocations := make([]int, 0)
+	for _, location := range locksmith.VirtualNodeLocation {
+		if !util.IntInSlice(virtualLocations, location) {
+			newLocations = append(newLocations, location)
+		}
+	}
+	locksmith.VirtualNodeLocation = newLocations
+
+	err = locksmith.broadcastVirtualNodes()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // broadcastHeartbeatTable sends heartbeat table to all nodes
@@ -118,6 +172,32 @@ func (locksmith *LockSmith) broadcastHeartbeatTable(excludeNodeID interface{}) {
 			log.Printf("Locksmith failed to send Heartbeat Table to Node %d: %s\n", pid, err)
 		}
 	}
+}
+
+// broadcastVirtualNodes sends the modified virtual nodes to every alive nodes
+// it is only done when a node is dead and virtual nodes are modified
+func (locksmith *LockSmith) broadcastVirtualNodes() error {
+	// Relay updated virtual nodes to others
+	for pid, address := range locksmith.RpcMap {
+		if pid == locksmith.Pid || !locksmith.HeartBeatTable[pid] {
+			continue
+		}
+		request := &message.Request{
+			From: locksmith.Pid,
+			To:   pid,
+			Code: message.UPDATE_VIRTUAL_NODES,
+			Payload: map[string]interface{}{
+				"virtualNodeMap":      locksmith.VirtualNodeMap,
+				"virtualNodeLocation": locksmith.VirtualNodeLocation,
+			},
+		}
+		var reply message.Reply
+		err := message.SendMessage(address, "Node.UpdateVirtualNodes", request, &reply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // monitorCoordinatorStatus monitors heartbeat table and always assign the highest alive node as coordinator
