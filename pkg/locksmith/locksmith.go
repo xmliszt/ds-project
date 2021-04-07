@@ -155,7 +155,7 @@ func (locksmith *LockSmith) broadcastHeartbeatTable(excludeNodeID interface{}) {
 		excludeNodeID = excludeNodeID.(int)
 	}
 	for pid, address := range locksmith.RpcMap {
-		if pid == excludeNodeID || pid == 0 || locksmith.HeartBeatTable[pid] {
+		if pid == excludeNodeID || pid == 0 || !locksmith.HeartBeatTable[pid] {
 			continue
 		}
 		request := &message.Request{
