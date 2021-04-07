@@ -13,12 +13,23 @@ const (
 	CREATE_VIRTUAL_NODE    = 5
 	UPDATE_VIRTUAL_NODES   = 6
 	UPDATE_RPC_MAP         = 7
-	DELETE_SECRET          = 12
-	RELAY_DELETE_SECRET    = 13
-	ACQUIRE_USER_LOCK      = 14
-	RELEASE_USER_LOCK      = 15
-	FETCH_ORIGINAL_SECRETS = 16
-	FETCH_REPLICA_SECRETS  = 17
+	STORE_AND_REPLICATE    = 8
+	STRICT_STORE           = 9  // Take list of v.nodes and send it forward R-1 nodes
+	EVENTUAL_STORE         = 10 // Sent by the neighbouring node to the next R-1 nodes
+	ACK_OWNER_NODE         = 11 // Sent by the neighbouring node to the owner node
+	REPLY_COORDINATOR      = 12 // Sent by the owner node to the coordinator
+	ACK_COORDINATOR        = 13
+	STRICT_OWNER_DOWN      = 14 // When Owner is down, Sent to Strict Con Node
+	ACK_STRICT_OWNER_DOWN  = 15 // ACK for STRICT_OWNER_DOWN
+	AID_RECOVERY           = 16 // All nodes conduct replication again
+	REQUST_DATA            = 17 // Newly revived node asks for it's original data
+	DELETE_SECRET          = 18
+	RELAY_DELETE_SECRET    = 19
+	ACQUIRE_USER_LOCK      = 20
+	RELEASE_USER_LOCK      = 21
+	FETCH_ORIGINAL_SECRETS = 22
+	FETCH_REPLICA_SECRETS  = 23
+	GIVE_ME_DATA           = 24
 )
 
 type Reply struct {
