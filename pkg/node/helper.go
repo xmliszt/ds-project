@@ -82,7 +82,7 @@ func (n *Node) getRelayVirtualNodes(startLocation int) ([]int, error) {
 
 // getReplicationLocations gets the locations of the virtual nodes which
 // are the owners of the secrets whose replicas are supposed to store in
-// this new born node
+// this new born node.
 func (n *Node) getReplicationLocations(location int) ([][]int, error) {
 	config, err := config.GetConfig()
 	if err != nil {
@@ -91,9 +91,55 @@ func (n *Node) getReplicationLocations(location int) ([][]int, error) {
 
 	res := make([][]int, 0)
 	nodesVisited := make([]int, 0)
+	virtualNodeCount := 0
+	var nextPhysicalNodeID int
 
-	idx := n.getVirtualLocationIndex(location)
+	ownLocationIdx := n.getVirtualLocationIndex(location)
 
+	// If my next and prev are same node, then i do not need to get replicas
+	// As all the replicas will be store at the first virtual node of the
+	// physical node that is different from its previous node
+	nextIdx := ownLocationIdx + 1
+	if nextIdx == len(n.VirtualNodeLocation) {
+		nextIdx = 0
+	}
+	prevIdx := ownLocationIdx - 1
+	if prevIdx == -1 {
+		prevIdx = len(n.VirtualNodeLocation) - 1
+	}
+	nextNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[n.VirtualNodeLocation[nextIdx]])
+	if err != nil {
+		return nil, err
+	}
+	prevNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[n.VirtualNodeLocation[prevIdx]])
+	if err != nil {
+		return nil, err
+	}
+	if nextNodeID == prevNodeID {
+		return [][]int{}, nil
+	}
+
+	// Get the next physical node ID that is not myself
+	idx := ownLocationIdx + 1
+	for {
+		if idx == len(n.VirtualNodeLocation) {
+			idx = 0
+		}
+		loc := n.VirtualNodeLocation[idx]
+		physicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[loc])
+		if err != nil {
+			return nil, err
+		}
+		if physicalNodeID == n.Pid {
+			idx++
+		} else {
+			nextPhysicalNodeID = physicalNodeID
+			break
+		}
+	}
+
+	// Get all previous virtual nodes
+	idx = ownLocationIdx - 1
 	for {
 		if len(nodesVisited) >= config.ConfigNode.ReplicationFactor {
 			break
@@ -115,9 +161,15 @@ func (n *Node) getReplicationLocations(location int) ([][]int, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !util.IntInSlice(nodesVisited, physicalNodeID) && physicalNodeID != n.Pid {
-			nodesVisited = append(nodesVisited, physicalNodeID)
-			res = append(res, []int{physicalNodeID, prevVirtualNodeLoc, virtualNodeLoc})
+		if !util.IntInSlice(nodesVisited, physicalNodeID) && physicalNodeID != n.Pid && physicalNodeID != nextPhysicalNodeID {
+			if virtualNodeCount < config.ConfigNode.VirtualNodesCount-1 {
+				virtualNodeCount++
+				res = append(res, []int{physicalNodeID, prevVirtualNodeLoc, virtualNodeLoc})
+			} else {
+				nodesVisited = append(nodesVisited, physicalNodeID)
+				res = append(res, []int{physicalNodeID, prevVirtualNodeLoc, virtualNodeLoc})
+				virtualNodeCount = 0
+			}
 		}
 		idx--
 	}

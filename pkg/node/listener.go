@@ -130,8 +130,6 @@ func (n *Node) GetSecrets(request *message.Request, reply *message.Reply) error 
 		Payload: secrets,
 	}
 
-	log.Printf("Node %d done fetching secrets from %d to %d: %v\n", n.Pid, from, to, secrets)
-
 	if toDelete {
 		for key := range secrets {
 			err := secret.RemoveSecret(n.Pid, key)
@@ -139,7 +137,6 @@ func (n *Node) GetSecrets(request *message.Request, reply *message.Reply) error 
 				return err
 			}
 		}
-		log.Printf("Node %d done deleting secrets from %d to %d: %v\n", n.Pid, from, to, secrets)
 	}
 
 	return nil

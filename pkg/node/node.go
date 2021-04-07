@@ -111,6 +111,7 @@ func (n *Node) updateData() error {
 		var prevVirtualNodeLocation int
 
 		ownLocationIdx := n.getVirtualLocationIndex(location)
+		var nextVirtualNodeName string
 
 		// Get the next physical node ID that is not myself
 		idx := ownLocationIdx + 1
@@ -132,6 +133,7 @@ func (n *Node) updateData() error {
 				} else {
 					prevVirtualNodeLocation = n.VirtualNodeLocation[ownLocationIdx-1]
 				}
+				nextVirtualNodeName = n.VirtualNodeMap[loc]
 				break
 			}
 		}
@@ -152,7 +154,7 @@ func (n *Node) updateData() error {
 			return err
 		}
 		fetchedSecrets := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
-		log.Printf("Node %d fetched original secrets from Node %d: %v\n", n.Pid, nextPhysicalNodeID, fetchedSecrets)
+		log.Printf("Virtual Node %s fetched original secrets from Virtual Node %s: %v\n", virtualNode, nextVirtualNodeName, fetchedSecrets)
 
 		// put secret to itself
 		for k, v := range fetchedSecrets {
@@ -164,7 +166,6 @@ func (n *Node) updateData() error {
 
 		// Get replica from previous nodes using RPC
 		replicationLocation, err := n.getReplicationLocations(location)
-		log.Printf("Previous nodes to contact: %v\n", replicationLocation)
 		if err != nil {
 			return err
 		}
@@ -186,7 +187,7 @@ func (n *Node) updateData() error {
 				return err
 			}
 			fetchedReplicas := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
-			log.Printf("Node %d fetched replica secrets from Node %d: %v\n", n.Pid, nodeID, fetchedReplicas)
+			log.Printf("Virtual Node %s fetched replica secrets from Virtual Node %s: %v\n", virtualNode, n.VirtualNodeMap[to], fetchedReplicas)
 
 			// put secret to itself
 			for k, v := range fetchedReplicas {
