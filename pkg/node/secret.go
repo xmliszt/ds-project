@@ -43,19 +43,7 @@ func (n *Node) putSecret(ctx echo.Context) error {
 	// Get the relayVirtualNodes
 	vNodeLoc := util.MapHashToVNodeLoc(n.VirtualNodeMap, n.VirtualNodeLocation, hashedAlias)
 	fmt.Println("This is the VNodeLoc", vNodeLoc)
-	// vNodeHash, err := util.GetHash(vNodeName)
-	if err != nil {
-		// log.Fatal("Error when hashing the Virtual node name")
-		return ctx.JSON(http.StatusInternalServerError, &api.Response{
-			Success: false,
-			Error:   err.Error(),
-			Data:    nil,
-		})
-	}
 
-	//
-
-	// vNodeLocation := n.
 	virtualNodesList, err := n.getRelayVirtualNodes(vNodeLoc)
 	fmt.Println("This is the VirtualNodeList", virtualNodesList)
 

@@ -78,14 +78,6 @@ func (n *Node) StrictReplication(request *message.Request, reply *message.Reply)
 		log.Println("Error coming from write", writeErr)
 		log.Fatal("Data file write failed for node", n.Pid)
 	}
-	// nextVNode = util.MapHashToVNode()
-
-	// Send eventual replication message to neighbouring nodes
-
-	// iHashedValue, _ := strconv.Atoi(hashedValue)
-	// uHashedValue := uint32(iHashedValue)
-	// nextVNodePid := util.FindNextVNode(n.Ring, n.VirtualNodeMap, n.VirtualNodeLocation, uHashedValue)
-	// nextVNodeActualPid := util.NodePidFromVNode(nextVNodePid)
 
 	nextVNodeLocation := relayNodes[rf-1]
 	nextVNodeName := n.VirtualNodeMap[nextVNodeLocation]
@@ -96,9 +88,15 @@ func (n *Node) StrictReplication(request *message.Request, reply *message.Reply)
 
 	// Check if the next node is alive
 	if n.checkHeartbeat(nextVNodeActualPid) {
-		n.sendEventualRepMsg(rf-1, hashedValue, secretToStore, relayNodes)
+		err := n.sendEventualRepMsg(rf-1, hashedValue, secretToStore, relayNodes)
+		if err != nil {
+			return err
+		}
 	} else {
-		n.sendEventualRepMsg(rf-2, hashedValue, secretToStore, relayNodes)
+		err := n.sendEventualRepMsg(rf-2, hashedValue, secretToStore, relayNodes)
+		if err != nil {
+			return err
+		}
 	}
 	// Reply here
 	*reply = message.Reply{
@@ -109,7 +107,6 @@ func (n *Node) StrictReplication(request *message.Request, reply *message.Reply)
 			"success": true,
 		},
 	}
-	fmt.Println("this is the reply", reply)
 	return nil
 }
 
@@ -125,7 +122,10 @@ func (n *Node) PerformEventualReplication(request *message.Request, reply *messa
 		return err
 	}
 	if rf > 1 {
-		n.sendEventualRepMsg(rf-1, hashedValue, secretToStore, relayNodes)
+		err := n.sendEventualRepMsg(rf-1, hashedValue, secretToStore, relayNodes)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
