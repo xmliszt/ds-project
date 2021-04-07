@@ -15,6 +15,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/pkg/secret"
 	"github.com/xmliszt/e-safe/util"
 )
 
@@ -69,6 +70,13 @@ func Start(nodeID int) {
 		log.Fatal(err)
 	}
 
+	if len(node.VirtualNodeLocation) > config.VirtualNodesCount {
+		err = node.updateData(nodeID) // Update data
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// Start RPC server
 	log.Printf("Node %d listening on: %v\n", node.Pid, address)
 	err = rpc.Register(node)
@@ -78,8 +86,140 @@ func Start(nodeID int) {
 	rpc.Accept(inbound)
 }
 
+// updataData grabs data from the next clockwise node
+// for the replicated data, it will grab from the previous nodes
+func (n *Node) updateData(nodeID int) error {
+	config, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+
+	// do for all virtual ndoes
+	for i := 1; i <= config.VirtualNodesCount; i++ {
+		virtualNode := strconv.Itoa(nodeID) + "-" + strconv.Itoa(i)
+		ulocation, e := util.GetHash(virtualNode)
+		location := int(ulocation)
+		if e != nil {
+			return e
+		}
+
+		for idx, loc := range n.VirtualNodeLocation {
+			if loc == location {
+				fmt.Println("loc", loc)
+				fmt.Println("idx", idx)
+				var nextVirtualNodeLocation int
+				if idx+1 == len(n.VirtualNodeLocation) {
+					nextVirtualNodeLocation = n.VirtualNodeLocation[0]
+				} else {
+					nextVirtualNodeLocation = n.VirtualNodeLocation[idx+1]
+				}
+				var prevVirtualNodeLocation int
+				if idx-1 < 0 { // loop from the tail of the slice if index of location is less than replication factor
+					prevVirtualNodeLocation = n.VirtualNodeLocation[len(n.VirtualNodeLocation)-1]
+				} else {
+					prevVirtualNodeLocation = n.VirtualNodeLocation[idx-1]
+				}
+				nextVirtualNode := n.VirtualNodeMap[nextVirtualNodeLocation]
+				nextPhysicalNode, err := util.GetPhysicalNode(nextVirtualNode)
+				if err != nil {
+					return err
+				}
+				// grab all data from the node
+				// TODO: change this to contact using RPC
+				dataFromNextNode, err := secret.GetSecrets(nextPhysicalNode, prevVirtualNodeLocation, location)
+				fmt.Println("range is", prevVirtualNodeLocation, location, "physicalnode", nextPhysicalNode, "datafromnextnode", dataFromNextNode)
+				if err != nil {
+					return err
+				}
+
+				// put secret to itself
+				for k, v := range dataFromNextNode {
+					err := secret.PutSecret(n.Pid, k, v)
+					if err != nil {
+						return err
+					}
+				}
+
+				// TODO: Get replica from previous nodes using RPC
+				replicationLocation, err := n.getReplicationLocation(location)
+				if err != nil {
+					return err
+				}
+				fmt.Println("replication location", replicationLocation)
+				for _, slice := range replicationLocation {
+					fmt.Println("slice0", slice[0], "slice1", slice[1], "slice2", slice[2])
+					dataFromPrevNode, err := secret.GetSecrets(slice[0], slice[1], slice[2])
+					fmt.Println("data from prev node", dataFromPrevNode)
+					if err != nil {
+						return err
+					}
+					// put secret to itself
+					for k, v := range dataFromPrevNode {
+						err := secret.PutSecret(nodeID, k, v)
+						if err != nil {
+							return err
+						}
+					}
+				}
+				// TODO: Delete from the next physical node using RPC
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (n *Node) getReplicationLocation(location int) ([][]int, error) {
+	config, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([][]int, 0)
+	nodesVisited := make([]int, 0)
+	loc := util.GetIndex(n.VirtualNodeLocation, location)
+	var virtualNode string
+
+	for len(nodesVisited) <= config.ReplicationFactor {
+		if loc < 0 { // loop from the tail of the slice if index of location is less than replication factor
+			moduloLoc := (loc * -1) % len(n.VirtualNodeLocation)
+			virtualNode = n.VirtualNodeMap[n.VirtualNodeLocation[len(n.VirtualNodeLocation)-moduloLoc]]
+		} else {
+			virtualNode = n.VirtualNodeMap[n.VirtualNodeLocation[loc]]
+		}
+		fmt.Println("virtualnode", virtualNode)
+		physicalNode, err := util.GetPhysicalNode(virtualNode)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("physical node", physicalNode)
+		if !util.IntInSlice(nodesVisited, physicalNode) {
+			nodesVisited = append(nodesVisited, physicalNode)
+			uvirtualNodeLoc, err := util.GetHash(virtualNode)
+			if err != nil {
+				return nil, err
+			}
+			virtualNodeLoc := int(uvirtualNodeLoc)
+			virtualNodeIdx := util.GetIndex(n.VirtualNodeLocation, virtualNodeLoc)
+			prevVirtualNodeIdx := virtualNodeIdx - 1
+			var prevVirtualNodeLoc int
+			if prevVirtualNodeIdx == -1 { // loop from the tail of the slice if index of location is less than replication factor
+				prevVirtualNodeLoc = n.VirtualNodeLocation[len(n.VirtualNodeLocation)-1]
+			} else {
+				prevVirtualNodeLoc = n.VirtualNodeLocation[prevVirtualNodeIdx]
+			}
+			slice := []int{physicalNode, prevVirtualNodeLoc, virtualNodeLoc}
+			res = append(res, slice)
+			fmt.Println("res", res)
+			loc -= 1
+		}
+	}
+
+	return res, nil
+}
+
 // signalNodeStart sends a signal to Locksmith server that the node has started
-// it is for Locksmith server to respond with the current RPC map
+// it is for Locksmith server to respond with the current RPC map-
 func (n *Node) signalNodeStart() error {
 	config, err := config.GetConfig()
 	if err != nil {
