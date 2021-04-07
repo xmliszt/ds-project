@@ -70,8 +70,11 @@ func Start(nodeID int) {
 		log.Fatal(err)
 	}
 
-	if len(node.VirtualNodeLocation) > config.VirtualNodesCount {
-		err = node.updateData(nodeID) // Update data
+	// If the number of nodes present (excluding Locksmith) is greater than replication factor
+	// Then start data re-distribution
+	if len(node.RpcMap)-1 > config.ConfigNode.ReplicationFactor {
+		log.Printf("Node %d starts data re-distribution!\n", node.Pid)
+		err := node.updateData() // Update data
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -88,7 +91,7 @@ func Start(nodeID int) {
 
 // updataData grabs data from the next clockwise node
 // for the replicated data, it will grab from the previous nodes
-func (n *Node) updateData(nodeID int) error {
+func (n *Node) updateData() error {
 	config, err := config.GetConfig()
 	if err != nil {
 		return err
@@ -96,92 +99,111 @@ func (n *Node) updateData(nodeID int) error {
 
 	// do for all virtual nodes
 	for i := 1; i <= config.VirtualNodesCount; i++ {
-		virtualNode := strconv.Itoa(nodeID) + "-" + strconv.Itoa(i)
+		virtualNode := strconv.Itoa(n.Pid) + "-" + strconv.Itoa(i)
 		ulocation, e := util.GetHash(virtualNode)
 		location := int(ulocation)
 		if e != nil {
 			return e
 		}
 
-		for idx, loc := range n.VirtualNodeLocation {
-			if loc == location {
-				var nextVirtualNodeLocation int
-				if idx+1 == len(n.VirtualNodeLocation) {
-					nextVirtualNodeLocation = n.VirtualNodeLocation[0]
-				} else {
-					nextVirtualNodeLocation = n.VirtualNodeLocation[idx+1]
-				}
-				var prevVirtualNodeLocation int
-				if idx-1 < 0 { // loop from the tail of the slice if index of location is less than replication factor
-					prevVirtualNodeLocation = n.VirtualNodeLocation[len(n.VirtualNodeLocation)-1]
-				} else {
-					prevVirtualNodeLocation = n.VirtualNodeLocation[idx-1]
-				}
-				nextVirtualNode := n.VirtualNodeMap[nextVirtualNodeLocation]
-				nextPhysicalNode, err := util.GetPhysicalNode(nextVirtualNode)
-				if err != nil {
-					return err
-				}
+		var nextPhysicalNodeID int
+		var prevVirtualNodeLocation int
 
-				// grab original data from the next node
-				originalSecretMigrationRequest := &message.Request{
-					From: n.Pid,
-					To:   nextPhysicalNode,
-					Code: message.FETCH_ORIGINAL_SECRETS,
-					Payload: map[string]interface{}{
-						"range":  []int{prevVirtualNodeLocation, location},
-						"delete": true, // If true, the target node will delete the data after sending
-					},
-				}
-				var originalSecretMigrationReply message.Reply
-				err = message.SendMessage(n.RpcMap[nextPhysicalNode], "Node.GetSecrets", originalSecretMigrationRequest, &originalSecretMigrationReply)
-				if err != nil {
-					return err
-				}
-				fetchedSecrets := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
+		idx := n.getVirtualLocationIndex(location)
 
-				// put secret to itself
-				for k, v := range fetchedSecrets {
-					err := secret.PutSecret(n.Pid, k, v)
-					if err != nil {
-						return err
-					}
-				}
-
-				// Get replica from previous nodes using RPC
-				replicationLocation, err := n.getReplicationLocations(location)
-				if err != nil {
-					return err
-				}
-				for _, slice := range replicationLocation {
-					nodeID, from, to := slice[0], slice[1], slice[2]
-
-					replicaSecretMigrationRequest := &message.Request{
-						From: n.Pid,
-						To:   nodeID,
-						Code: message.FETCH_REPLICA_SECRETS,
-						Payload: map[string]interface{}{
-							"range":  []int{from, to},
-							"delete": false, // if false, the target node will retain the data after sending
-						},
-					}
-					var replicaSecretMigrationReply message.Reply
-					err = message.SendMessage(n.RpcMap[nextPhysicalNode], "Node.GetSecrets", replicaSecretMigrationRequest, &replicaSecretMigrationReply)
-					if err != nil {
-						return err
-					}
-					fetchedReplicas := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
-
-					// put secret to itself
-					for k, v := range fetchedReplicas {
-						err := secret.PutSecret(n.Pid, k, v)
-						if err != nil {
-							return err
-						}
-					}
-				}
-
+		// Get the next physical node ID that is not myself
+		for {
+			if idx == len(n.VirtualNodeLocation) {
+				idx = 0
+			}
+			loc := n.VirtualNodeLocation[idx]
+			physicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[loc])
+			if err != nil {
+				return err
+			}
+			if physicalNodeID == n.Pid {
+				idx++
+			} else {
+				nextPhysicalNodeID = physicalNodeID
 				break
+			}
+		}
+
+		// Get the previous physical node ID that is not myself
+		for {
+			if idx == -1 {
+				idx = len(n.VirtualNodeLocation) - 1
+			}
+			loc := n.VirtualNodeLocation[idx]
+			physicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[loc])
+			if err != nil {
+				return err
+			}
+			if physicalNodeID == n.Pid {
+				idx--
+			} else {
+				prevVirtualNodeLocation = loc
+				break
+			}
+		}
+
+		// grab original data from the next node
+		originalSecretMigrationRequest := &message.Request{
+			From: n.Pid,
+			To:   nextPhysicalNodeID,
+			Code: message.FETCH_ORIGINAL_SECRETS,
+			Payload: map[string]interface{}{
+				"range":  []int{prevVirtualNodeLocation, location},
+				"delete": true, // If true, the target node will delete the data after sending
+			},
+		}
+		var originalSecretMigrationReply message.Reply
+		err = message.SendMessage(n.RpcMap[nextPhysicalNodeID], "Node.GetSecrets", originalSecretMigrationRequest, &originalSecretMigrationReply)
+		if err != nil {
+			return err
+		}
+		fetchedSecrets := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
+		log.Printf("Node %d fetched original secrets from Node %d: %v\n", n.Pid, nextPhysicalNodeID, fetchedSecrets)
+
+		// put secret to itself
+		for k, v := range fetchedSecrets {
+			err := secret.PutSecret(n.Pid, k, v)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Get replica from previous nodes using RPC
+		replicationLocation, err := n.getReplicationLocations(location)
+		if err != nil {
+			return err
+		}
+		for _, slice := range replicationLocation {
+			nodeID, from, to := slice[0], slice[1], slice[2]
+
+			replicaSecretMigrationRequest := &message.Request{
+				From: n.Pid,
+				To:   nodeID,
+				Code: message.FETCH_REPLICA_SECRETS,
+				Payload: map[string]interface{}{
+					"range":  []int{from, to},
+					"delete": false, // if false, the target node will retain the data after sending
+				},
+			}
+			var replicaSecretMigrationReply message.Reply
+			err = message.SendMessage(n.RpcMap[nextPhysicalNodeID], "Node.GetSecrets", replicaSecretMigrationRequest, &replicaSecretMigrationReply)
+			if err != nil {
+				return err
+			}
+			fetchedReplicas := originalSecretMigrationReply.Payload.(map[string]*secret.Secret)
+			log.Printf("Node %d fetched replica secrets from Node %d: %v\n", n.Pid, nextPhysicalNodeID, fetchedReplicas)
+
+			// put secret to itself
+			for k, v := range fetchedReplicas {
+				err := secret.PutSecret(n.Pid, k, v)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
