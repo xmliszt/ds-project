@@ -15,6 +15,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/message"
+	"github.com/xmliszt/e-safe/pkg/secret"
 	"github.com/xmliszt/e-safe/util"
 )
 
@@ -199,4 +200,198 @@ func (n *Node) startRouter() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Strict Consistency with R = 2. Send ACK directly to coordinator
+// func (n *Node) strictDown(rf int, key string, secret secret.Secret, relayNodes []int) error {
+// 	config, err := config.GetConfig()
+// 	if err != nil {
+// 		log.Printf("Node %d is unable to strict down to next node: %s\n", n.Pid, err)
+// 		return err
+// 	}
+// 	nextNodeLoc := relayNodes[config.ConfigNode.ReplicationFactor-rf]
+// 	nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[nextNodeLoc])
+// 	if err != nil {
+// 		log.Printf("Node %d is unable to strict down to next node: %s\n", n.Pid, err)
+// 		return err
+// 	}
+// 	nextNodeAddr := n.RpcMap[nextPhysicalNodeID]
+// 	request := &message.Request{
+// 		From: n.Pid,
+// 		To:   nextPhysicalNodeID,
+// 		Code: message.STRICT_OWNER_DOWN,
+// 		Payload: map[string]interface{}{
+// 			"rf":     rf,
+// 			"key":    key,
+// 			"secret": secret,
+// 			"nodes":  relayNodes,
+// 		},
+// 	}
+
+// 	var reply message.Reply
+// 	err = message.SendMessage(nextNodeAddr, "Node.PerformStrictDown", request, &reply)
+// 	return nil
+// }
+
+// func (n *Node) performEventualRep(rf int, key string, secret secret.Secret, relayNodes []int) error {
+
+// 	return nil
+// }
+
+// Strict node sends to Even node
+func (n *Node) sendEventualRepMsg(rf int, key string, secret secret.Secret, relayNodes []int) error {
+	config, err := config.GetConfig()
+	if err != nil {
+		log.Printf("Node %d is unable to relay secret deletion to next node: %s\n", n.Pid, err)
+		return err
+	}
+	nextNodeLoc := relayNodes[config.ConfigNode.ReplicationFactor-rf]
+	nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[nextNodeLoc])
+	if err != nil {
+		log.Printf("Node %d is unable to relay secret deletion to next node: %s\n", n.Pid, err)
+		return err
+	}
+	nextNodeAddr := n.RpcMap[nextPhysicalNodeID]
+	request := &message.Request{
+		From: n.Pid,
+		To:   nextPhysicalNodeID,
+		Code: message.EVENTUAL_STORE,
+		Payload: map[string]interface{}{
+			"rf":     rf,
+			"key":    key,
+			"secret": secret,
+			"nodes":  relayNodes,
+		},
+	}
+
+	var reply message.Reply
+	err = message.SendMessage(nextNodeAddr, "Node.PerformEventualReplication", request, &reply)
+	if err != nil {
+		// log.Fatal("Error when geting the list of virtual nodes for replication")
+		log.Println("Error while sending message to peroform eventual replication")
+		return err
+	}
+	return nil
+}
+
+// // Takes in Hash value. Will generate list of nodes to store the data
+// // need to check the logic later
+// // implemented in helper.go already
+// func (n *Node) generateReplicationList(hashValue uint32) []string {
+// 	var VirtualNodeList []string
+// 	var nodeIdList []int
+// 	var positionForOwner int
+// 	nextPid, nextVirtualNode := n.findNextPid(hashValue)
+// 	VirtualNodeList = append(VirtualNodeList, nextVirtualNode)
+// 	nodeIdList = append(nodeIdList, nextPid)
+// 	hashValueForOwnerNode, _ := util.GetHash(nextVirtualNode)
+// 	for idx, location := range n.VirtualNodeLocation {
+// 		if location == int(hashValueForOwnerNode) {
+// 			positionForOwner = idx
+// 		}
+// 	}
+// 	if len(VirtualNodeList) > 3 {
+// 		for indx, position := range n.VirtualNodeLocation {
+// 			if indx > positionForOwner {
+// 				nextId := n.findPidByVname(n.VirtualNodeMap[position])
+// 				// need to check whether the id in the nodeIdList or not
+// 				if contain(nodeIdList, nextId) {
+// 					continue
+// 				} else {
+// 					nodeIdList = append(nodeIdList, nextId)
+// 					VirtualNodeList = append(VirtualNodeList, n.VirtualNodeMap[position])
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return VirtualNodeList
+
+// }
+
+// func contain(nodeIdList []int, id int) bool {
+// 	var result bool
+// 	for id1 := range nodeIdList {
+// 		if id1 == id {
+// 			result = true
+// 		} else {
+// 			result = false
+// 		}
+// 	}
+// 	return result
+// }
+
+// // No input. Will generate list of nodes to store the data.
+// func (n *Node) generateRecoveryList() {}
+
+// // TODO: move to util
+// // This function will takes in the hashed value then find the next node's pid and next node's virtual node name
+// func (n *Node) findNextPid(hashedValue uint32) (int, string) {
+// 	var nextVirtualNode string
+// 	var nextPid int
+// 	var err error
+// 	for idx, location := range n.VirtualNodeLocation {
+// 		if int(hashedValue) < location {
+// 			// current_virtual_node := n.RingMap[x]
+// 			nextVirtualNode = n.VirtualNodeMap[n.Ring[(idx+1)]]
+// 			string_list := strings.Split(nextVirtualNode, "-")
+// 			nextPid, err = strconv.Atoi(string_list[0])
+// 			if err != nil {
+// 				fmt.Println(err)
+// 			}
+// 			break
+// 		}
+// 	}
+// 	return nextPid, nextVirtualNode
+// }
+
+// // TODO: Already in Util, consider removing
+// func (n *Node) findPidByVname(vName string) int {
+// 	string_list := strings.Split(vName, "-")
+// 	Pid, _ := strconv.Atoi(string_list[0])
+// 	return Pid
+// }
+
+func (n *Node) checkHeartbeat(pid int) bool {
+	return n.HeartBeatTable[pid]
+}
+
+// Start Strict Replication
+func (n *Node) sendStrictRepMsg(rf int, key string, value secret.Secret, relayNodes []int) error {
+	config, err := config.GetConfig()
+	if err != nil {
+		log.Printf("Node %d is unable to relay strict consistency to next node: %s\n", n.Pid, err)
+		return err
+	}
+	nextNodeLoc := relayNodes[config.ConfigNode.ReplicationFactor-rf]
+	nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[nextNodeLoc])
+	if err != nil {
+		log.Printf("Node %d is unable to relay strict consistency to next node: %s\n", n.Pid, err)
+		return err
+	}
+	nextNodeAddr := n.RpcMap[nextPhysicalNodeID]
+	request := &message.Request{
+		From: n.Pid,
+		To:   nextPhysicalNodeID,
+		Code: message.STRICT_STORE,
+		Payload: map[string]interface{}{
+			"rf":     rf,
+			"key":    key,
+			"secret": value,
+			"nodes":  relayNodes,
+		},
+	}
+
+	var reply message.Reply
+	err = message.SendMessage(nextNodeAddr, "Node.StrictReplication", request, &reply)
+	log.Println("This is the reply from strict", reply)
+	if err != nil {
+		log.Printf("Node %d strict consistency error: %s\n", n.Pid, err)
+		return err
+	}
+	replyPayload := reply.Payload.(map[string]interface{})
+	if replyPayload["success"].(bool) {
+		// ISSUE: How do I respond to the caller with a positive ACK.
+		return nil
+	}
+	return nil
 }
