@@ -62,18 +62,33 @@ func GetSecrets(pid int, from int, to int) (map[string]*Secret, error) {
 		return nil, fileError
 	} else {
 		specificData := make(map[string]*Secret)
-		for key, secret := range allData {
+		for key, secretVal := range allData {
 			keyInt, err := strconv.Atoi(key)
 			if err != nil {
 				return nil, err
 			}
-			if keyInt >= from && keyInt <= to {
-				secret, err := encodeSecret(secret)
-				if err != nil {
-					return nil, err
+			// tail to head case
+			var secret *Secret
+			if from > to {
+				if (keyInt >= from && keyInt <= int(^uint32(0))) || (keyInt >= 0 && keyInt <= to) {
+					if keyInt >= from && keyInt <= to {
+						secret, err = encodeSecret(secretVal)
+						if err != nil {
+							return nil, err
+						}
+						specificData[key] = secret
+					}
 				}
-				specificData[key] = secret
+			} else {
+				if keyInt >= from && keyInt <= to {
+					secret, err = encodeSecret(secretVal)
+					if err != nil {
+						return nil, err
+					}
+					specificData[key] = secret
+				}
 			}
+
 		}
 		return specificData, nil
 	}
