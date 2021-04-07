@@ -109,3 +109,35 @@ func (n *Node) RelayDeleteSecret(request *message.Request, reply *message.Reply)
 	}
 	return nil
 }
+
+// GetSecrets gets the secrets from given range and send back
+func (n *Node) GetSecrets(request *message.Request, reply *message.Reply) error {
+	payload := request.Payload.(map[string]interface{})
+	fetchRange := payload["range"].([]int)
+	toDelete := payload["delete"].(bool)
+	from := fetchRange[0]
+	to := fetchRange[1]
+
+	secrets, err := secret.GetSecrets(n.Pid, from, to)
+	if err != nil {
+		return err
+	}
+
+	*reply = message.Reply{
+		From:    n.Pid,
+		To:      request.From,
+		ReplyTo: request.Code,
+		Payload: secrets,
+	}
+
+	if toDelete {
+		for key := range secrets {
+			err := secret.RemoveSecret(n.Pid, key)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}

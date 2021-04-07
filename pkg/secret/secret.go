@@ -122,3 +122,26 @@ func UpdateSecret(pid int, key string, secret *Secret) error {
 	}
 	return nil
 }
+
+// RemoveSecret is different than deletion, our "deletion" is defined
+// as simply 'update' the value of secret to be nil
+// RemoveSecret delete the entire entry from the data
+func RemoveSecret(pid int, key string) error {
+	allData, fileError := file.ReadDataFile(pid)
+	if fileError != nil {
+		return fileError
+	}
+	// check if the key exists in the data file
+	// if exist, overwrite
+	// if does not exist, throw error
+	if _, ok := allData[key]; !ok {
+		return fmt.Errorf("key [%s] does not exist", key)
+	}
+
+	delete(allData, key)
+	fileError = file.OverwriteDataFile(pid, allData)
+	if fileError != nil {
+		return fileError
+	}
+	return nil
+}
