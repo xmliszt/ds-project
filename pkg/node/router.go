@@ -24,6 +24,12 @@ func (n *Node) getRouter() *echo.Echo {
 		Format: "${time_rfc3339} From: ${remote_ip} Method: ${method} URI: ${uri} Status: ${status} Error: ${error} Latency: ${latency_human}\n",
 	}))
 
+	// CORS
+	router.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:8080"},
+		AllowHeaders: []string{echo.HeaderAccessControlAllowOrigin, echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+	}))
+
 	// Bind JWT token auth to sub-routers
 	apiRouter.Use(middleware.JWT([]byte("secret")))
 	dashboardRouter.Use(middleware.JWT([]byte("secret")))

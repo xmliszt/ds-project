@@ -1,7 +1,7 @@
 Server:
   Secret: ~!@e-safe2021 # App secret, used to encrypt and decrypt password
   Host: localhost # Server host
-  Port: 8080 # Server port
+  Port: 8081 # Server port
 Locksmith:
   Port: 5000 # Locksmith RPC port
 Node:
