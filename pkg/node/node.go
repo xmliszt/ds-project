@@ -158,9 +158,12 @@ func (n *Node) updateData() error {
 
 		// put secret to itself
 		for k, v := range fetchedSecrets {
-			err := secret.PutSecret(n.Pid, k, v)
+			err := secret.UpdateSecret(n.Pid, k, v)
 			if err != nil {
-				return err
+				err := secret.PutSecret(n.Pid, k, v)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -191,9 +194,12 @@ func (n *Node) updateData() error {
 
 			// put secret to itself
 			for k, v := range fetchedReplicas {
-				err := secret.PutSecret(n.Pid, k, v)
+				err := secret.UpdateSecret(n.Pid, k, v)
 				if err != nil {
-					return err
+					err := secret.PutSecret(n.Pid, k, v)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
