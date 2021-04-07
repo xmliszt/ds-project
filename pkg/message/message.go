@@ -27,6 +27,7 @@ const (
 	RELAY_DELETE_SECRET    = 13
 	ACQUIRE_USER_LOCK      = 14
 	RELEASE_USER_LOCK      = 15
+	GIVE_ME_DATA           = 16
 )
 
 type Reply struct {
