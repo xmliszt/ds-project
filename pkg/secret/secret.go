@@ -49,7 +49,7 @@ func GetSecret(pid int, id string) (*Secret, error) {
 				return secret, nil
 			}
 		}
-		unknownSecretIDError := errors.New("use	rname not available")
+		unknownSecretIDError := errors.New("key for secret not available")
 		return nil, unknownSecretIDError
 	}
 
