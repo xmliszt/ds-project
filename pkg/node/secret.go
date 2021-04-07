@@ -152,16 +152,82 @@ func (n *Node) getSecret(ctx echo.Context) error {
 		})
 	}
 	// Handle getting a secret
-	// Test a sample secret
-	secret, err := secret.GetSecret(1, "126")
+
+	// Need to decide where is the secret
+	hashedAlias, err := util.GetHash(alias)
+	if err != nil{
+		log.Println("Hashing error")
+		return err
+	}
+
+	ownerVNodeLoc := util.MapHashToVNodeLoc(n.VirtualNodeMap, n.VirtualNodeLocation, hashedAlias)
+	ownerPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[ownerVNodeLoc])
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		// log.Fatal("Error when geting the list of virtual nodes for replication")
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
 		})
 	}
-	if role > secret.Role {
+
+	ownerNodeAddress := n.RpcMap[ownerPhysicalNodeID]
+	ownerRequest := &message.Request{
+		From: n.Pid,
+		To:   ownerPhysicalNodeID,
+		Code: message.GIVE_ME_DATA,
+		Payload: map[string]interface{}{
+			"key": int(hashedAlias),
+		},
+	}
+
+	var reply message.Reply
+	// if(n.checkHeartbeat(nextPhysicalNodeID)){
+	err = message.SendMessage(ownerNodeAddress, "Node.GetData", ownerRequest, &reply)
+	if err != nil{
+		virtualNodesList, err := n.getRelayVirtualNodes(ownerVNodeLoc)
+		if err!= nil{
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
+				Success: false,
+				Error:   err.Error(),
+				Data:    nil,
+			})
+		}
+
+		nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[virtualNodesList[0]])
+		if err!= nil{
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
+				Success: false,
+				Error:   err.Error(),
+				Data:    nil,
+			})
+		}
+		ownerNodeAddress := n.RpcMap[nextPhysicalNodeID]
+
+		nextNodeRequest := &message.Request{
+			From: n.Pid,
+			To:   nextPhysicalNodeID,
+			Code: message.GIVE_ME_DATA,
+			Payload: map[string]interface{}{
+				"key": int(hashedAlias),
+			},
+		}
+
+		err = message.SendMessage(ownerNodeAddress, "Node.GetData", nextNodeRequest, &reply)
+		if err!= nil{
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
+				Success: false,
+				Error:   err.Error(),
+				Data:    nil,
+			})
+		}
+
+	}
+
+	payload := reply.Payload.(map[string]interface{})
+	retrievedSecret := payload["secret"].(secret.Secret)
+
+	if role > retrievedSecret.Role {
 		return ctx.JSON(http.StatusUnauthorized, &api.Response{
 			Success: false,
 			Error:   "Your role is too low for this information!",
@@ -171,12 +237,42 @@ func (n *Node) getSecret(ctx echo.Context) error {
 			},
 		})
 	}
+
 	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
 		Data: []interface{}{
-			secret,
+			retrievedSecret,
 		},
 	})
+
+	
+	// Ask the respective node to get the secret
+	// Reply based on the reply from the respective node
+	// Test a sample secret
+	// secret, err := secret.GetSecret(1, "126")
+	// if err != nil {
+	// 	return ctx.JSON(http.StatusBadRequest, &api.Response{
+	// 		Success: false,
+	// 		Error:   err.Error(),
+	// 		Data:    nil,
+	// 	})
+	// }
+	// if role > secret.Role {
+	// 	return ctx.JSON(http.StatusUnauthorized, &api.Response{
+	// 		Success: false,
+	// 		Error:   "Your role is too low for this information!",
+	// 		Data: &user.User{
+	// 			Username: claims["username"].(string),
+	// 			Role:     role,
+	// 		},
+	// 	})
+	// }
+	// return ctx.JSON(http.StatusOK, &api.Response{
+	// 	Success: true,
+	// 	Data: []interface{}{
+	// 		secret,
+	// 	},
+	// })
 }
 
 // Delete a secret

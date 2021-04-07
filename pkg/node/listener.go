@@ -268,3 +268,25 @@ func (n *Node) StoreAndReplicate(request *message.Request, reply *message.Reply)
 	//log.Printf("Node %d deleted secret [%s] successfully!\n", n.Pid, keyToDelete)
 	return nil
 }
+
+func (n *Node) GetData(request *message.Request, reply *message.Reply) error {
+	payload := request.Payload.(map[string]interface{})
+	keyToSearch := payload["key"].(int)
+
+	retrievedSecret, err := secret.GetSecret(n.Pid,strconv.Itoa(keyToSearch))
+	if err != nil{
+		log.Println("Unable to retrieve secret from file")
+		return err
+	}
+
+	*reply = message.Reply{
+		From:    n.Pid,
+		To:      request.From,
+		ReplyTo: request.Code,
+		Payload: map[string]interface{}{
+			"secret": retrievedSecret,
+		},
+	}
+
+	return nil
+}
