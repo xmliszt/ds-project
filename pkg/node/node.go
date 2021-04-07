@@ -6,8 +6,12 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/xmliszt/e-safe/config"
@@ -26,6 +30,7 @@ type Node struct {
 	VirtualNodeLocation []int
 	VirtualNodeMap      map[int]string
 	Router              *echo.Echo
+	KillSignal          chan os.Signal // For signalling shutdown of router server
 }
 
 // Start is the main function that starts the entire program
@@ -52,10 +57,10 @@ func Start(nodeID int) {
 		VirtualNodeLocation: make([]int, 0),
 		VirtualNodeMap:      make(map[int]string),
 		HeartBeatTable:      make(map[int]bool),
+		KillSignal:          make(chan os.Signal, 1),
 	}
 
-	router := node.getRouter()
-	node.Router = router
+	signal.Notify(node.KillSignal, syscall.SIGTERM)
 
 	err = node.signalNodeStart() // Send start signal to Locksmith
 	if err != nil {
@@ -176,22 +181,23 @@ func (n *Node) createVirtualNodes() error {
 	return nil
 }
 
-// Starts the router
+// Starts the router -> Graceful shutdown
 func (n *Node) startRouter() {
+	n.Router = n.getRouter()
 	config, err := config.GetConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = n.Router.Start(fmt.Sprintf(":%d", config.ConfigServer.Port))
-	if err != nil {
-		log.Println(err)
-	}
-}
-
-// Shutdown the router
-func (n *Node) stopRouter() {
-	log.Printf("Node %d REST server closed!\n", n.Pid)
-	err := n.Router.Shutdown(context.Background())
+	go func() {
+		err := n.Router.Start(fmt.Sprintf(":%d", config.ConfigServer.Port))
+		if err != nil {
+			log.Printf("Node %d REST server closed!\n", n.Pid)
+		}
+	}()
+	<-n.KillSignal // Blocking, until kill signal received
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = n.Router.Shutdown(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -9,9 +9,9 @@ import (
 
 // User contains all the variables that are found in User database
 type User struct {
-	Username string `json:"username"` // Username as string
-	Password string `json:"password"` // Password as string
-	Role     int    `json:"role"`     // Int to identify role (clearance level)
+	Username string `json:"Username"` // Username as string
+	Password string `json:"Password"` // Password as string
+	Role     int    `json:"Role"`     // Int to identify role (clearance level)
 }
 
 // UserMethods contains all method references for interacting with the User database
@@ -35,7 +35,7 @@ func encodeUser(data interface{}) (*User, error) {
 	return user, nil
 }
 
-func decodeUser(user User) interface{} {
+func decodeUser(user *User) interface{} {
 	var r interface{} = user
 	return r
 }
@@ -62,7 +62,7 @@ func GetUser(username string) (*User, error) {
 }
 
 // CreateUser creates a user based on the User structure provided
-func CreateUser(user User, userID string) error {
+func CreateUser(user *User, userID string) error {
 	newUserVal := decodeUser(user)
 	newUser := map[string]interface{}{userID: newUserVal}
 	fileError := file.WriteUsersFile(newUser)

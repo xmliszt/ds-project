@@ -1,8 +1,9 @@
 Server:
-  Host: localhost
-  Port: 8080
+  Secret: ~!@e-safe2021 # App secret, used to encrypt and decrypt password
+  Host: localhost # Server host
+  Port: 8080 # Server port
 Locksmith:
-  Port: 5000
+  Port: 5000 # Locksmith RPC port
 Node:
   HeartbeatInterval: 2 # check heartbeat every n seconds
   CoordinatorMonitorInterval: 1 # check and update coordinator every n seconds

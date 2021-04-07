@@ -1,6 +1,7 @@
 package node
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -40,6 +41,17 @@ func (n *Node) getRelayVirtualNodes(startLocation int) ([]int, error) {
 		return nil, err
 	}
 	replicationFactor := config.ConfigNode.ReplicationFactor
+
+	// Check if physical node number is at least equal to replication factor
+	aliveNodeCount := 0
+	for _, alive := range n.HeartBeatTable {
+		if alive {
+			aliveNodeCount++
+		}
+	}
+	if aliveNodeCount <= replicationFactor {
+		return nil, fmt.Errorf("number of nodes alive [%d] cannot be smaller or equal to the replication factor [%d]. Please consider either creating more nodes or modifying the replication factor", aliveNodeCount, replicationFactor)
+	}
 	relayVirtualNodes := make([]int, replicationFactor)
 	pickedPhysicalNodes := make([]int, replicationFactor)
 	selector := 0

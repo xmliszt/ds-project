@@ -87,7 +87,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 	// Handle delete a secret
 	uSecretHash, err := util.GetHash(alias)
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -105,7 +105,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 
 	targetNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[targetLocation])
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, &api.Response{
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
 			Error:   err.Error(),
 			Data:    nil,
@@ -130,7 +130,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 		// When owner node is down, we still need to try delete all replicas
 		relayVirtualNodes, err := n.getRelayVirtualNodes(targetLocation)
 		if err != nil {
-			return ctx.JSON(http.StatusBadRequest, &api.Response{
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
 				Success: false,
 				Error:   err.Error(),
 				Data:    nil,
@@ -138,7 +138,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 		}
 		config, err := config.GetConfig()
 		if err != nil {
-			return ctx.JSON(http.StatusBadRequest, &api.Response{
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
 				Success: false,
 				Error:   err.Error(),
 				Data:    nil,
@@ -146,7 +146,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 		}
 		err = n.relaySecretDeletion(config.ConfigNode.ReplicationFactor, strconv.Itoa(secretHash), relayVirtualNodes)
 		if err != nil {
-			return ctx.JSON(http.StatusBadRequest, &api.Response{
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
 				Success: false,
 				Error:   err.Error(),
 				Data:    nil,
@@ -164,7 +164,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 			})
 		} else {
 			err := replyPayload["error"].(error)
-			return ctx.JSON(http.StatusBadRequest, &api.Response{
+			return ctx.JSON(http.StatusInternalServerError, &api.Response{
 				Success: false,
 				Error:   err.Error(),
 				Data:    nil,

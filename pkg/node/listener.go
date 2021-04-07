@@ -3,6 +3,7 @@ package node
 import (
 	"log"
 	"strconv"
+	"syscall"
 
 	"github.com/xmliszt/e-safe/config"
 	"github.com/xmliszt/e-safe/pkg/message"
@@ -36,7 +37,7 @@ func (n *Node) AssignCoordinator(request *message.Request, reply *message.Reply)
 func (n *Node) RemoveCoordinator(request *message.Request, reply *message.Reply) error {
 	log.Printf("Node %d is no longer the coordinator!\n", n.Pid)
 	n.IsCoordinator = false
-	n.stopRouter()
+	n.KillSignal <- syscall.SIGTERM
 	return nil
 }
 
