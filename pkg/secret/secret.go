@@ -72,6 +72,9 @@ func GetSecrets(pid int, from int, to int) (map[string]*Secret, error) {
 	} else {
 		specificData := make(map[string]*Secret)
 		for key, secretVal := range allData {
+			if secretVal == nil {
+				continue
+			}
 			keyInt, err := strconv.Atoi(key)
 			if err != nil {
 				return nil, err
