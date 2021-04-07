@@ -56,7 +56,12 @@ func (n *Node) getRelayVirtualNodes(startLocation int) ([]int, error) {
 	pickedPhysicalNodes := make([]int, replicationFactor)
 	selector := 0
 	idx := n.getVirtualLocationIndex(startLocation) + 1
-	pickedPhysicalNodes = append(pickedPhysicalNodes, n.Pid) // dont choose myself as next relay
+
+	ownerNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[startLocation])
+	if err != nil {
+		return nil, err
+	}
+	pickedPhysicalNodes = append(pickedPhysicalNodes, ownerNodeID) // dont choose myself as next relay
 	for {
 		if idx == len(n.VirtualNodeLocation) {
 			idx = 0

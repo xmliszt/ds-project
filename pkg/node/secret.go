@@ -18,8 +18,8 @@ import (
 
 // Put a secret, if exists, update. If does not exist, create a new one
 func (n *Node) putSecret(ctx echo.Context) error {
-	secret := new(secret.Secret)
-	if err := ctx.Bind(secret); err != nil {
+	recievingSecret := new(secret.Secret)
+	if err := ctx.Bind(recievingSecret); err != nil {
 		return ctx.JSON(http.StatusBadRequest, &api.Response{
 			Success: false,
 			Error:   err.Error(),
@@ -27,7 +27,120 @@ func (n *Node) putSecret(ctx echo.Context) error {
 		})
 	}
 	// Handle 3 replications and store data
-	return ctx.String(http.StatusOK, fmt.Sprintf("Putting secret: %+v...", secret))
+	// Hash the alias secret, get a string
+	fmt.Println("This is the alias for the secret", recievingSecret.Alias)
+	hashedAlias, err := util.GetHash(recievingSecret.Alias)
+	fmt.Println("This is the hashedAlias", hashedAlias)
+	if err != nil {
+		// log.Fatal("Error when hashing the alias")
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+
+	// Get the relayVirtualNodes
+	vNodeLoc := util.MapHashToVNodeLoc(n.VirtualNodeMap, n.VirtualNodeLocation, hashedAlias)
+	fmt.Println("This is the VNodeLoc", vNodeLoc)
+	// vNodeHash, err := util.GetHash(vNodeName)
+	if err != nil {
+		// log.Fatal("Error when hashing the Virtual node name")
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+
+	//
+
+	// vNodeLocation := n.
+	virtualNodesList, err := n.getRelayVirtualNodes(vNodeLoc)
+	fmt.Println("This is the VirtualNodeList", virtualNodesList)
+
+	if err != nil {
+		// log.Fatal("Error when geting the list of virtual nodes for replication")
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+
+	nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[vNodeLoc])
+	fmt.Println("this is the nextPhyscialNodeID", nextPhysicalNodeID)
+
+	nextPhysicalNodeRpc := n.RpcMap[nextPhysicalNodeID]
+	fmt.Println("this is the nextPhysicalNodeRpc", nextPhysicalNodeRpc)
+
+	// Construct request message
+	ownerRequest := &message.Request{
+		From: n.Pid,
+		To:   nextPhysicalNodeID,
+		Code: message.STORE_AND_REPLICATE,
+		Payload: map[string]interface{}{
+			"rf":     3,
+			"key":    int(hashedAlias),
+			"secret": recievingSecret,
+			"nodes":  virtualNodesList,
+		},
+	}
+
+	// Check if owner node is alive
+	var reply message.Reply
+	// if(n.checkHeartbeat(nextPhysicalNodeID)){
+	err = message.SendMessage(nextPhysicalNodeRpc, "Node.StoreAndReplicate", ownerRequest, &reply)
+	if err != nil {
+		log.Println(err)
+		log.Println("Error sending message to owner node. It is dead")
+		log.Println("Sending strict node down to next node")
+		vNodeNextToDeadOwner := virtualNodesList[0]
+		// Construct request message
+		request := &message.Request{
+			From: n.Pid,
+			To:   nextPhysicalNodeID,
+			Code: message.STRICT_OWNER_DOWN,
+			Payload: map[string]interface{}{
+				"rf":     2,
+				"key":    hashedAlias,
+				"secret": recievingSecret,
+				"nodes":  virtualNodesList,
+			},
+		}
+
+		vNodeNameNextToOwner := n.VirtualNodeMap[vNodeNextToDeadOwner]
+		nextnextPhysicalNodeID, err := getPhysicalNodeID(vNodeNameNextToOwner)
+
+		nextnextPhysicalNodeRpc := n.RpcMap[nextnextPhysicalNodeID]
+		err = message.SendMessage(nextnextPhysicalNodeRpc, "Node.PerformStrictDown", request, &reply)
+		if err != nil {
+			log.Fatal("Node next to owner is dead. Problemo, should never happen")
+		}
+
+	}
+
+	payload := reply.Payload.(map[string]interface{})
+	if payload["success"].(bool) == true {
+		return ctx.String(http.StatusOK, fmt.Sprintf("Putting secret: %+v...", recievingSecret))
+	} else {
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: false,
+			Error:   err.Error(),
+			Data:    nil,
+		})
+	}
+
+	// } else {
+	// Send store and replicate message to owner node
+
+	// Wait for reply from owner node
+	// Else send to next node
+	// Send strict down to next virtual node
+
+	// Wait for reply from next virtual node
+	return ctx.String(http.StatusOK, fmt.Sprintf("Putting secret: %+v...", recievingSecret))
+	// return nil;
 }
 
 // Get a secret - deprecated

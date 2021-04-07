@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -19,6 +20,29 @@ func MapHashToVNode(virtualNodeMap map[int]string, virtualNodeLocation []int, ha
 		continue
 	}
 	return virtualNodeName
+}
+
+func MapHashToVNodeLoc(virtualNodeMap map[int]string, virtualNodeLocation []int, hashedValue uint32) int {
+	// var virtualNodeName string;
+	var result int
+	fmt.Println("These are the inputs", virtualNodeLocation, virtualNodeMap, hashedValue)
+	fmt.Println("this is the int version of the hash", int(hashedValue))
+	intHashedValue := int(hashedValue)
+	for idx, location := range virtualNodeLocation {
+
+		if intHashedValue < location {
+			// virtualNodeName = virtualNodeMap[location]
+			// print(location)
+			fmt.Println("This is the location in a loop", location)
+			// result = location
+			result = virtualNodeLocation[idx]
+			break
+		}
+		continue
+	}
+	// fmt.Println("This is the location for the owner node", result)
+	return result
+	// return virtualNodeName
 }
 
 func NodePidFromVNode(virtualNodeName string) int {

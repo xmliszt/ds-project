@@ -204,40 +204,40 @@ func (n *Node) startRouter() {
 }
 
 // Strict Consistency with R = 2. Send ACK directly to coordinator
-func (n *Node) strictDown(rf int, key string, secret secret.Secret, relayNodes []int) error {
-	config, err := config.GetConfig()
-	if err != nil {
-		log.Printf("Node %d is unable to strict down to next node: %s\n", n.Pid, err)
-		return err
-	}
-	nextNodeLoc := relayNodes[config.ConfigNode.ReplicationFactor-rf]
-	nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[nextNodeLoc])
-	if err != nil {
-		log.Printf("Node %d is unable to strict down to next node: %s\n", n.Pid, err)
-		return err
-	}
-	nextNodeAddr := n.RpcMap[nextPhysicalNodeID]
-	request := &message.Request{
-		From: n.Pid,
-		To:   nextPhysicalNodeID,
-		Code: message.STRICT_OWNER_DOWN,
-		Payload: map[string]interface{}{
-			"rf":     rf,
-			"key":    key,
-			"secret": secret,
-			"nodes":  relayNodes,
-		},
-	}
+// func (n *Node) strictDown(rf int, key string, secret secret.Secret, relayNodes []int) error {
+// 	config, err := config.GetConfig()
+// 	if err != nil {
+// 		log.Printf("Node %d is unable to strict down to next node: %s\n", n.Pid, err)
+// 		return err
+// 	}
+// 	nextNodeLoc := relayNodes[config.ConfigNode.ReplicationFactor-rf]
+// 	nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[nextNodeLoc])
+// 	if err != nil {
+// 		log.Printf("Node %d is unable to strict down to next node: %s\n", n.Pid, err)
+// 		return err
+// 	}
+// 	nextNodeAddr := n.RpcMap[nextPhysicalNodeID]
+// 	request := &message.Request{
+// 		From: n.Pid,
+// 		To:   nextPhysicalNodeID,
+// 		Code: message.STRICT_OWNER_DOWN,
+// 		Payload: map[string]interface{}{
+// 			"rf":     rf,
+// 			"key":    key,
+// 			"secret": secret,
+// 			"nodes":  relayNodes,
+// 		},
+// 	}
 
-	var reply message.Reply
-	err = message.SendMessage(nextNodeAddr, "Node.PerformStrictDown", request, &reply)
-	return nil
-}
+// 	var reply message.Reply
+// 	err = message.SendMessage(nextNodeAddr, "Node.PerformStrictDown", request, &reply)
+// 	return nil
+// }
 
-func (n *Node) performEventualRep(rf int, key string, secret secret.Secret, relayNodes []int) error {
+// func (n *Node) performEventualRep(rf int, key string, secret secret.Secret, relayNodes []int) error {
 
-	return nil
-}
+// 	return nil
+// }
 
 // Strict node sends to Even node
 func (n *Node) sendEventualRepMsg(rf int, key string, secret secret.Secret, relayNodes []int) error {
@@ -379,14 +379,15 @@ func (n *Node) sendStrictRepMsg(rf int, key string, value secret.Secret, relayNo
 
 	var reply message.Reply
 	err = message.SendMessage(nextNodeAddr, "Node.StrictReplication", request, &reply)
-	replyPayload := reply.Payload.(map[string]interface{})
-	if replyPayload["success"].(bool) == true {
-		// ISSUE: How do I respond to the caller with a positive ACK.
-		return nil
-	}
+	log.Println("This is the reply from strict", reply)
 	if err != nil {
 		log.Printf("Node %d strict consistency error: %s\n", n.Pid, err)
 		return err
+	}
+	replyPayload := reply.Payload.(map[string]interface{})
+	if replyPayload["success"].(bool) {
+		// ISSUE: How do I respond to the caller with a positive ACK.
+		return nil
 	}
 	return nil
 }
