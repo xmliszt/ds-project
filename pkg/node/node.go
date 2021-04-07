@@ -73,7 +73,7 @@ func Start(nodeID int) {
 
 	// If the number of nodes present (excluding Locksmith) is greater than replication factor
 	// Then start data re-distribution
-	if len(node.RpcMap)-1 > config.ConfigNode.ReplicationFactor {
+	if len(node.RpcMap)-1 > config.ConfigNode.ReplicationFactor+1 {
 		log.Printf("Node %d starts data re-distribution!\n", node.Pid)
 		err := node.updateData() // Update data
 		if err != nil {
