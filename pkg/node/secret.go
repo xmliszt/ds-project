@@ -99,7 +99,7 @@ func (n *Node) putSecret(ctx echo.Context) error {
 			Code: message.STRICT_OWNER_DOWN,
 			Payload: map[string]interface{}{
 				"rf":     2,
-				"key":    hashedAlias,
+				"key":    strconv.Itoa(int((hashedAlias))),
 				"secret": recievingSecret,
 				"nodes":  virtualNodesList,
 			},
@@ -126,7 +126,9 @@ func (n *Node) putSecret(ctx echo.Context) error {
 
 	payload := reply.Payload.(map[string]interface{})
 	if payload["success"].(bool) {
-		return ctx.String(http.StatusOK, fmt.Sprintf("Putting secret: %+v...", recievingSecret))
+		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+			Success: true,
+		})
 	} else {
 		return ctx.JSON(http.StatusInternalServerError, &api.Response{
 			Success: false,
@@ -155,7 +157,7 @@ func (n *Node) getSecret(ctx echo.Context) error {
 
 	// Need to decide where is the secret
 	hashedAlias, err := util.GetHash(alias)
-	if err != nil{
+	if err != nil {
 		log.Println("Hashing error")
 		return err
 	}
@@ -184,9 +186,9 @@ func (n *Node) getSecret(ctx echo.Context) error {
 	var reply message.Reply
 	// if(n.checkHeartbeat(nextPhysicalNodeID)){
 	err = message.SendMessage(ownerNodeAddress, "Node.GetData", ownerRequest, &reply)
-	if err != nil{
+	if err != nil {
 		virtualNodesList, err := n.getRelayVirtualNodes(ownerVNodeLoc)
-		if err!= nil{
+		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, &api.Response{
 				Success: false,
 				Error:   err.Error(),
@@ -195,7 +197,7 @@ func (n *Node) getSecret(ctx echo.Context) error {
 		}
 
 		nextPhysicalNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[virtualNodesList[0]])
-		if err!= nil{
+		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, &api.Response{
 				Success: false,
 				Error:   err.Error(),
@@ -214,7 +216,7 @@ func (n *Node) getSecret(ctx echo.Context) error {
 		}
 
 		err = message.SendMessage(ownerNodeAddress, "Node.GetData", nextNodeRequest, &reply)
-		if err!= nil{
+		if err != nil {
 			return ctx.JSON(http.StatusInternalServerError, &api.Response{
 				Success: false,
 				Error:   err.Error(),
@@ -245,7 +247,6 @@ func (n *Node) getSecret(ctx echo.Context) error {
 		},
 	})
 
-	
 	// Ask the respective node to get the secret
 	// Reply based on the reply from the respective node
 	// Test a sample secret
@@ -429,7 +430,6 @@ func (n *Node) relaySecretDeletion(rf int, key string, relayNodes []int) error {
 	var reply message.Reply
 	err = message.SendMessage(nextNodeAddr, "Node.RelayDeleteSecret", request, &reply)
 	if err != nil {
-		log.Printf("Node %d relay secret deletion error: %s\n", n.Pid, err)
 		for rf > 1 {
 			err := n.relaySecretDeletion(rf-1, key, relayNodes)
 			if err != nil {
@@ -441,7 +441,7 @@ func (n *Node) relaySecretDeletion(rf int, key string, relayNodes []int) error {
 				break
 			}
 		}
-		return err
+		return nil
 	}
 	return nil
 }
