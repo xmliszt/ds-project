@@ -40,8 +40,17 @@ func GetSecret(pid int, id string) (*Secret, error) {
 	if fileError != nil {
 		return nil, fileError
 	} else {
+		if len(allData) <= 0 {
+			return nil, fmt.Errorf("key for secret not available")
+		}
+		if _, ok := allData[id]; !ok {
+			return nil, fmt.Errorf("key for secret not available")
+		}
 		for key, val := range allData {
 			if key == id {
+				if val == nil {
+					return nil, fmt.Errorf("key for secret not available")
+				}
 				secret, err := encodeSecret(val)
 				if err != nil {
 					return nil, err
