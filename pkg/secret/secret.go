@@ -10,9 +10,9 @@ import (
 )
 
 type Secret struct {
-	Alias string `json:"alias"` // Alias of secret (identifier)
-	Value string `json:"value"` // Value of secret
-	Role  int    `json:"role"`  // Int to identify role (clearance level)
+	Alias string `json:"Alias"` // Alias of secret (identifier)
+	Value string `json:"Value"` // Value of secret
+	Role  int    `json:"Role"`  // Int to identify role (clearance level)
 }
 
 func encodeSecret(data interface{}) (*Secret, error) {
