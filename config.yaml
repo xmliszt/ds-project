@@ -9,3 +9,4 @@ Node:
   CoordinatorMonitorInterval: 1 # check and update coordinator every n seconds
   VirtualNodesCount: 3 # Number of virtual nodes for each node
   ReplicationFactor: 3 # Number of replication to perform
+  NumberOfHashing: 3 # The number of time consistent hashing is performed recursively
