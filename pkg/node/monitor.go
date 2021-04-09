@@ -8,17 +8,18 @@ import (
 )
 
 type MonitorInfo struct {
-	VirtualNodes         []int
+	VirtualNodesLocation map[string]int
 	VirtualNodesCapacity map[string]int
-	VirtualNodesMap      map[int]string
 	HeartbeatTable       map[int]bool
 }
 
 // getMonitorInfo fetches information on virtual nodes and send to client for monitor GUI
 func (n *Node) getMonitorInfo(ctx echo.Context) error {
 	nodesCapacity := make(map[string]int)
+	nodesLocation := make(map[string]int)
 	for idx, loc := range n.VirtualNodeLocation {
 		name := n.VirtualNodeMap[loc]
+		nodesLocation[name] = loc
 		if idx+1 < len(n.VirtualNodeLocation) {
 			nodesCapacity[name] = n.VirtualNodeLocation[idx+1] - 1 - loc
 		} else {
@@ -27,13 +28,11 @@ func (n *Node) getMonitorInfo(ctx echo.Context) error {
 	}
 
 	info := &MonitorInfo{
-		VirtualNodes:         n.VirtualNodeLocation,
-		VirtualNodesMap:      n.VirtualNodeMap,
+		VirtualNodesLocation: nodesLocation,
 		HeartbeatTable:       n.HeartBeatTable,
 		VirtualNodesCapacity: nodesCapacity,
 	}
-
-	return ctx.JSON(http.StatusInternalServerError, &api.Response{
+	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
 		Data:    info,
 	})

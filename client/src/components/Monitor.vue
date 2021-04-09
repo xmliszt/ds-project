@@ -67,51 +67,46 @@
 import Chart from "chart.js/auto";
 
 import { getRandomColor } from "../util/util";
+import { getMonitorInfo } from "../service/monitor";
 
 export default {
   data() {
     return {
       ring: null,
       loading: false,
-      virtualNodeInfoData: [
-        {
-          name: "1-1",
-          location: 100,
-          physicalNodeID: 1,
-          alive: true,
-        },
-      ],
-      monitorNodesData: [
-        {
-          v: "1",
-          s: false,
-        },
-        {
-          v: "2",
-          s: true,
-        },
-        {
-          v: "3",
-          s: true,
-        },
-      ],
-      virtualNodes: [
-        "1-1",
-        "2-1",
-        "3-1",
-        "1-2",
-        "1-3",
-        "2-2",
-        "3-3",
-        "2-3",
-        "3-2",
-      ],
-      virtualNodesProportions: [300, 50, 100, 12, 45, 60, 131, 214, 495],
+      virtualNodeInfoData: [],
+      monitorNodesData: [],
+      virtualNodes: [],
+      virtualNodesProportions: [],
       virtualNodesColors: [],
     };
   },
   methods: {
-    async fetchVirtualNodesInformation() {},
+    async fetchVirtualNodesInformation() {
+      var info = await getMonitorInfo();
+      var heartbeatTable = info.data.HeartbeatTable;
+      var nodesCapacity = info.data.VirtualNodesCapacity;
+      var nodesLocation = info.data.VirtualNodesLocation;
+      Object.entries(nodesCapacity).forEach(([name, capacity]) => {
+        this.virtualNodes.push(name);
+        this.virtualNodesProportions.push(capacity);
+      });
+      Object.entries(heartbeatTable).forEach(([nid, alive]) => {
+        this.monitorNodesData.push({
+          v: nid,
+          s: alive,
+        });
+      });
+      Object.entries(nodesLocation).forEach(([name, location]) => {
+        var nid = Number(name.split("-")[0]);
+        this.virtualNodeInfoData.push({
+          name: name,
+          location: location,
+          physicalNodeID: nid,
+          alive: heartbeatTable[nid],
+        });
+      });
+    },
   },
   async mounted() {
     // get nodes information
@@ -125,34 +120,40 @@ export default {
     }
 
     // generate doughnut chart
-    var ctx = document.getElementById("ring").getContext("2d");
-    this.ring = new Chart(ctx, {
-      type: "doughnut",
-      data: {
-        labels: this.virtualNodes,
-        datasets: [
-          {
-            label: "Virtual Nodes Ring Structure",
-            data: this.virtualNodesProportions,
-            backgroundColor: this.virtualNodesColors,
-            hoverOffset: 4,
-          },
-        ],
-      },
-      options: {
-        responsive: false,
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: function (context) {
-                var label = context.label;
-                return "Virtual Node: " + label;
+    if (document.getElementById("ring")) {
+      var ctx = document.getElementById("ring").getContext("2d");
+      this.ring = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: this.virtualNodes,
+          datasets: [
+            {
+              label: "Virtual Nodes Ring Structure",
+              data: this.virtualNodesProportions,
+              backgroundColor: this.virtualNodesColors,
+              hoverOffset: 4,
+            },
+          ],
+        },
+        options: {
+          responsive: false,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  var label = context.label;
+                  return "Virtual Node: " + label;
+                },
               },
             },
           },
         },
-      },
-    });
+      });
+    } else {
+      this.$message.error(
+        "Failed to load the monitoring information! Please try again!"
+      );
+    }
   },
 };
 </script>
