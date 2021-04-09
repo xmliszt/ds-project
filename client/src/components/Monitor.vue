@@ -1,17 +1,17 @@
 <template>
   <div class="monitor">
+    <el-button @click="refresh">Refresh</el-button>
     <div class="minitor-content-wrapper">
       <div class="canvas-left-placeholder">
-        <el-table
-          :data="virtualNodeInfoData"
-          height="38rem"
-          v-loading="loading"
-          size="mini"
-          border
-        >
-          <el-table-column prop="name" label="Node Name" width="120">
+        <el-table :data="virtualNodeInfoData" height="38rem" size="mini" border>
+          <el-table-column prop="name" label="Node Name" width="120" sortable>
           </el-table-column>
-          <el-table-column prop="location" label="Location"></el-table-column>
+          <el-table-column
+            prop="location"
+            label="Location"
+            width="120"
+            sortable
+          ></el-table-column>
           <el-table-column label="From">
             <template slot-scope="scope">
               Node {{ scope.row.physicalNodeID }}
@@ -38,7 +38,6 @@
         <el-table
           :data="monitorNodesData"
           height="38rem"
-          v-loading="loading"
           border
           size="mini"
           :show-header="false"
@@ -72,55 +71,64 @@ import { getMonitorInfo } from "../service/monitor";
 export default {
   data() {
     return {
+      ws: null,
       ring: null,
-      loading: false,
       virtualNodeInfoData: [],
       monitorNodesData: [],
       virtualNodes: [],
       virtualNodesProportions: [],
       virtualNodesColors: [],
+      physicalNodesColors: Object(),
     };
   },
   methods: {
-    async fetchVirtualNodesInformation() {
-      var info = await getMonitorInfo();
-      var heartbeatTable = info.data.HeartbeatTable;
-      var nodesCapacity = info.data.VirtualNodesCapacity;
-      var nodesLocation = info.data.VirtualNodesLocation;
-      Object.entries(nodesCapacity).forEach(([name, capacity]) => {
-        this.virtualNodes.push(name);
-        this.virtualNodesProportions.push(capacity);
-      });
+    refresh() {
+      this.fetchData();
+    },
+    async fetchData() {
+      this.virtualNodeInfoData = [];
+      this.monitorNodesData = [];
+      this.virtualNodes = [];
+      this.virtualNodesProportions = [];
+      this.virtualNodesColors = [];
+
+      var data = await getMonitorInfo();
+      var heartbeatTable = data.data.HeartbeatTable;
+      var nodesCapacity = data.data.VirtualNodesCapacity;
+      var nodesLocation = data.data.VirtualNodesLocation;
+      var nameLocations = data.data.VirtualNodes;
+
       Object.entries(heartbeatTable).forEach(([nid, alive]) => {
         this.monitorNodesData.push({
           v: nid,
           s: alive,
         });
+        if (!(nid in this.physicalNodesColors)) {
+          this.physicalNodesColors[nid] = getRandomColor();
+        }
       });
-      Object.entries(nodesLocation).forEach(([name, location]) => {
+
+      nameLocations.forEach((name) => {
         var nid = Number(name.split("-")[0]);
+        var capacity = nodesCapacity[name];
+        var location = nodesLocation[name];
+        var alive = heartbeatTable[nid];
+
+        this.virtualNodes.push(name);
+        this.virtualNodesProportions.push(capacity);
+        this.virtualNodesColors.push(this.physicalNodesColors[nid]);
         this.virtualNodeInfoData.push({
           name: name,
           location: location,
           physicalNodeID: nid,
-          alive: heartbeatTable[nid],
+          alive: alive,
         });
       });
-    },
-  },
-  async mounted() {
-    // get nodes information
-    this.loading = true;
-    await this.fetchVirtualNodesInformation();
-    this.loading = false;
 
-    // generate random colors
-    for (let i = 0; i < this.virtualNodes.length; i++) {
-      this.virtualNodesColors.push(getRandomColor());
-    }
+      if (this.ring !== null) {
+        this.ring.destroy();
+      }
 
-    // generate doughnut chart
-    if (document.getElementById("ring")) {
       var ctx = document.getElementById("ring").getContext("2d");
       this.ring = new Chart(ctx, {
         type: "doughnut",
@@ -146,14 +154,16 @@ export default {
                 },
               },
             },
+            legend: {
+              display: false,
+            },
           },
         },
       });
-    } else {
-      this.$message.error(
-        "Failed to load the monitoring information! Please try again!"
-      );
-    }
+    },
+  },
+  mounted() {
+    this.fetchData();
   },
 };
 </script>
@@ -170,7 +180,7 @@ export default {
 
 .canvas-left-placeholder {
   margin-right: 4rem;
-  width: 25rem;
+  width: 26rem;
   padding-left: 2rem;
 }
 
@@ -179,7 +189,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: right;
-  width: 25rem;
+  width: 26rem;
   padding-right: 2rem;
 }
 </style>
