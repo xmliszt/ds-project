@@ -12,3 +12,10 @@ export function parseJwt(token) {
 
   return JSON.parse(jsonPayload);
 }
+
+export function getRandomColor() {
+  const red = Math.floor(((1 + Math.random()) * 256) / 2.5);
+  const green = Math.floor(((1 + Math.random()) * 256) / 2.5);
+  const blue = Math.floor(((1 + Math.random()) * 256) / 2.5);
+  return "rgb(" + red + ", " + green + ", " + blue + ")";
+}

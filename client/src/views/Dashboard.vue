@@ -1,10 +1,10 @@
 <template>
   <div class="dashboard">
     <Logout />
+    <MonitorSwitch />
     <div class="dashboard-wrapper drop-shadow-box">
       <UserInfo :username="user.username" :role="user.role" />
-      <SecretCreation />
-      <SecretTable :role="user.role" />
+      <router-view />
     </div>
   </div>
 </template>
@@ -12,16 +12,14 @@
 <script>
 import UserInfo from "../components/UserInfo";
 import Logout from "../components/Logout";
-import SecretTable from "../components/SecretTable";
-import SecretCreation from "../components/SecretCreation";
+import MonitorSwitch from "../components/MonitorSwitch";
 
 import { parseJwt } from "../util/util";
 export default {
   components: {
     UserInfo,
     Logout,
-    SecretTable,
-    SecretCreation,
+    MonitorSwitch,
   },
   data() {
     return {
