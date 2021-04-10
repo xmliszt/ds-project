@@ -1,5 +1,6 @@
 <template>
   <div class="monitor">
+    <div>0</div>
     <div class="minitor-content-wrapper">
       <div class="canvas-left-placeholder">
         <el-table :data="virtualNodeInfoData" height="38rem" size="mini" border>

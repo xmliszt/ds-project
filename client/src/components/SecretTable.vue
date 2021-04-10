@@ -46,7 +46,7 @@
               <el-input
                 v-model="search"
                 size="small"
-                placeholder="Type to search"
+                placeholder="Search alias/description..."
                 clearable
               />
             </template>
