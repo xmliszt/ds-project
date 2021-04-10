@@ -1,6 +1,6 @@
 <template>
   <div>
-    <SecretCreation />
+    <SecretCreation :role="role" />
     <div class="secret-table">
       <div class="secret-table-wrapper">
         <el-table
@@ -134,7 +134,7 @@ export default {
       //TODO: call delete secret API
     },
   },
-  async created() {
+  created() {
     var jwt = localStorage.getItem("token");
     if (jwt === null) {
       this.$message.error("You are not logged in!");
