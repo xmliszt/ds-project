@@ -1,6 +1,5 @@
 <template>
   <div class="monitor">
-    <el-button @click="refresh">Refresh</el-button>
     <div class="minitor-content-wrapper">
       <div class="canvas-left-placeholder">
         <el-table :data="virtualNodeInfoData" height="38rem" size="mini" border>
@@ -65,13 +64,13 @@
 <script>
 import Chart from "chart.js/auto";
 
-import { getRandomColor } from "../util/util";
+import { getRandomColor, deepCompareArray } from "../util/util";
 import { getMonitorInfo } from "../service/monitor";
 
 export default {
   data() {
     return {
-      ws: null,
+      monitorInterval: null,
       ring: null,
       virtualNodeInfoData: [],
       monitorNodesData: [],
@@ -82,15 +81,12 @@ export default {
     };
   },
   methods: {
-    refresh() {
-      this.fetchData();
-    },
     async fetchData() {
-      this.virtualNodeInfoData = [];
-      this.monitorNodesData = [];
-      this.virtualNodes = [];
-      this.virtualNodesProportions = [];
-      this.virtualNodesColors = [];
+      var virtualNodeInfoData = [];
+      var monitorNodesData = [];
+      var virtualNodes = [];
+      var virtualNodesProportions = [];
+      var virtualNodesColors = [];
 
       var data = await getMonitorInfo();
       var heartbeatTable = data.data.HeartbeatTable;
@@ -99,7 +95,7 @@ export default {
       var nameLocations = data.data.VirtualNodes;
 
       Object.entries(heartbeatTable).forEach(([nid, alive]) => {
-        this.monitorNodesData.push({
+        monitorNodesData.push({
           v: nid,
           s: alive,
         });
@@ -114,10 +110,10 @@ export default {
         var location = nodesLocation[name];
         var alive = heartbeatTable[nid];
 
-        this.virtualNodes.push(name);
-        this.virtualNodesProportions.push(capacity);
-        this.virtualNodesColors.push(this.physicalNodesColors[nid]);
-        this.virtualNodeInfoData.push({
+        virtualNodes.push(name);
+        virtualNodesProportions.push(capacity);
+        virtualNodesColors.push(this.physicalNodesColors[nid]);
+        virtualNodeInfoData.push({
           name: name,
           location: location,
           physicalNodeID: nid,
@@ -125,45 +121,88 @@ export default {
         });
       });
 
-      if (this.ring !== null) {
-        this.ring.destroy();
+      if (!deepCompareArray(this.virtualNodeInfoData, virtualNodeInfoData)) {
+        this.virtualNodeInfoData = virtualNodeInfoData;
       }
 
-      var ctx = document.getElementById("ring").getContext("2d");
-      this.ring = new Chart(ctx, {
-        type: "doughnut",
-        data: {
-          labels: this.virtualNodes,
-          datasets: [
-            {
-              label: "Virtual Nodes Ring Structure",
-              data: this.virtualNodesProportions,
-              backgroundColor: this.virtualNodesColors,
-              hoverOffset: 4,
-            },
-          ],
-        },
-        options: {
-          responsive: false,
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function (context) {
-                  var label = context.label;
-                  return "Virtual Node: " + label;
+      if (!deepCompareArray(this.monitorNodesData, monitorNodesData)) {
+        this.monitorNodesData = monitorNodesData;
+      }
+
+      if (
+        !deepCompareArray(this.virtualNodes, virtualNodes) ||
+        !deepCompareArray(
+          this.virtualNodesProportions,
+          virtualNodesProportions
+        ) ||
+        !deepCompareArray(this.virtualNodesColors, virtualNodesColors)
+      ) {
+        if (!deepCompareArray(this.virtualNodes, virtualNodes)) {
+          this.virtualNodes = virtualNodes;
+        }
+
+        if (
+          !deepCompareArray(
+            this.virtualNodesProportions,
+            virtualNodesProportions
+          )
+        ) {
+          this.virtualNodesProportions = virtualNodesProportions;
+        }
+
+        if (!deepCompareArray(this.virtualNodesColors, virtualNodesColors)) {
+          this.virtualNodesColors = virtualNodesColors;
+        }
+
+        if (this.ring !== null) {
+          this.ring.destroy();
+        }
+
+        var ctx = document.getElementById("ring").getContext("2d");
+        this.ring = new Chart(ctx, {
+          type: "doughnut",
+          data: {
+            labels: this.virtualNodes,
+            datasets: [
+              {
+                label: "Virtual Nodes Ring Structure",
+                data: this.virtualNodesProportions,
+                backgroundColor: this.virtualNodesColors,
+                hoverOffset: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: false,
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    var label = context.label;
+                    return "Virtual Node: " + label;
+                  },
                 },
               },
-            },
-            legend: {
-              display: false,
+              legend: {
+                display: false,
+              },
             },
           },
-        },
-      });
+        });
+      }
     },
   },
   mounted() {
-    this.fetchData();
+    if (this.monitorInterval === null) {
+      this.monitorInterval = setInterval(() => {
+        this.fetchData();
+      }, 1000);
+    }
+  },
+  destroyed() {
+    if (this.monitorInterval) {
+      this.monitorInterval.stopInterval();
+    }
   },
 };
 </script>

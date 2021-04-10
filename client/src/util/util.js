@@ -19,3 +19,16 @@ export function getRandomColor() {
   const blue = Math.floor(((1 + Math.random()) * 256) / 2);
   return "rgb(" + red + ", " + green + ", " + blue + ")";
 }
+
+export function deepCompareObject(objA, objB) {
+  Object.keys(objA).forEach((k) => {
+    if (objA[k] !== objB[k]) {
+      return false;
+    }
+  });
+  return true;
+}
+
+export function deepCompareArray(arrA, arrB) {
+  return JSON.stringify(arrA) === JSON.stringify(arrB);
+}
