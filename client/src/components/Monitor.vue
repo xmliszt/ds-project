@@ -200,9 +200,9 @@ export default {
       }, 1000);
     }
   },
-  destroyed() {
+  beforeDestroy() {
     if (this.monitorInterval) {
-      this.monitorInterval.stopInterval();
+      clearInterval(this.monitorInterval);
     }
   },
 };
