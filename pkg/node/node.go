@@ -298,6 +298,7 @@ func (n *Node) createVirtualNodes() error {
 			Payload: map[string]interface{}{
 				"virtualNodeMap":      n.VirtualNodeMap,
 				"virtualNodeLocation": n.VirtualNodeLocation,
+				"rpcMap":              n.RpcMap,
 			},
 		}
 		err = message.SendMessage(address, "Node.UpdateVirtualNodes", request, &reply)
