@@ -94,7 +94,7 @@ func (locksmith *LockSmith) checkHeartbeat() {
 					// Remove virtual nodes
 					err := locksmith.removeVirtualNodes(pid)
 					if err != nil {
-						log.Fatal(err)
+						log.Print(err)
 					}
 				}
 			} else {
@@ -144,6 +144,9 @@ func (locksmith *LockSmith) removeVirtualNodes(nodeID int) error {
 	}
 	locksmith.VirtualNodeLocation = newLocations
 
+	// Remove from RPCMap
+	delete(locksmith.RpcMap, nodeID)
+
 	err = locksmith.broadcastVirtualNodes()
 	if err != nil {
 		return err
@@ -174,7 +177,7 @@ func (locksmith *LockSmith) broadcastHeartbeatTable(excludeNodeID interface{}) {
 	}
 }
 
-// broadcastVirtualNodes sends the modified virtual nodes to every alive nodes
+// broadcastVirtualNodes sends the modified virtual nodes and RPC map to every alive nodes
 // it is only done when a node is dead and virtual nodes are modified
 func (locksmith *LockSmith) broadcastVirtualNodes() error {
 	// Relay updated virtual nodes to others
@@ -189,6 +192,7 @@ func (locksmith *LockSmith) broadcastVirtualNodes() error {
 			Payload: map[string]interface{}{
 				"virtualNodeMap":      locksmith.VirtualNodeMap,
 				"virtualNodeLocation": locksmith.VirtualNodeLocation,
+				"rpcMap":              locksmith.RpcMap,
 			},
 		}
 		var reply message.Reply

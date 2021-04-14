@@ -43,5 +43,11 @@ func (n *Node) getRoutes() []api.Route {
 			Handler: n.logIn,
 			Auth:    false,
 		},
+		{
+			Method:  echo.GET,
+			Path:    "/monitor",
+			Handler: n.getMonitorInfo,
+			Auth:    true,
+		},
 	}
 }

@@ -46,9 +46,12 @@ func (n *Node) UpdateVirtualNodes(request *message.Request, reply *message.Reply
 	payload := request.Payload.(map[string]interface{})
 	locations := payload["virtualNodeLocation"]
 	virtualNode := payload["virtualNodeMap"]
+	rpcMap := payload["rpcMap"]
 	n.VirtualNodeLocation = locations.([]int)
 	n.VirtualNodeMap = virtualNode.(map[int]string)
+	n.RpcMap = rpcMap.(map[int]string)
 	log.Printf("Node %d updated virtual nodes: %v | %+v\n", n.Pid, n.VirtualNodeLocation, n.VirtualNodeMap)
+	log.Printf("Node %d updated rpc map: %+v\n", n.Pid, n.RpcMap)
 	return nil
 }
 

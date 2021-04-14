@@ -45,7 +45,6 @@ func (n *Node) logIn(ctx echo.Context) error {
 			Data:    nil,
 		})
 	}
-
 	userIDHash, err := util.GetHash(u.Username)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, &api.Response{

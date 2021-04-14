@@ -16,3 +16,7 @@ To start as a Node:
 ```
 go run cmd/e-safe/main.go -node
 ```
+
+## Demo
+
+![](./doc/demo.gif)
