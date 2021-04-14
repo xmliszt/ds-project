@@ -384,6 +384,7 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 	role, _ := strconv.Atoi(claims["role"].(string))
 
 	fmt.Println("User role is: ", role)
+	var finalOutputList []secret.Secret
 
 	// Global variable listOSecrets := []*secret.Secret
 	var listOSecrets []secret.Secret
@@ -419,6 +420,18 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 				print(listOSecrets)
 			}
 		}
+
+	}
+
+	// Check for dupllicates
+	duplicateMap := make(map[string]secret.Secret)
+	for _, secretValue := range listOSecrets {
+		if _, ok := duplicateMap[secretValue.Alias]; ok {
+			log.Println("dups found")
+		} else {
+			duplicateMap[secretValue.Alias] = secretValue
+			finalOutputList = append(finalOutputList, secretValue)
+		}
 	}
 
 	// Send listOSecrets to client
@@ -427,7 +440,7 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 		Error:   "",
 		Data: map[string]interface{}{
 			"role": role,
-			"data": listOSecrets,
+			"data": finalOutputList,
 		},
 	})
 }
