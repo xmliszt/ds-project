@@ -30,6 +30,7 @@ const (
 	FETCH_ORIGINAL_SECRETS = 22
 	FETCH_REPLICA_SECRETS  = 23
 	GIVE_ME_DATA           = 24
+	GET_ALL_SECRETS        = 25
 )
 
 type Reply struct {

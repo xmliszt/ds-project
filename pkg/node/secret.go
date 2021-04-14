@@ -385,19 +385,49 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 
 	fmt.Println("User role is: ", role)
 
-	// Handle get all secrets
+	// Global variable listOSecrets := []*secret.Secret
+	var listOSecrets []secret.Secret
+	// for all physical nodes in the ring
+	for key, value := range n.RpcMap {
+		// Check each physical node's heartbeat
+		if n.checkHeartbeat(key) {
+
+			// Send each physical node a message asking for all secrets within that role's scope
+			request := &message.Request{
+				From: n.Pid,
+				To:   key,
+				Code: message.GET_ALL_SECRETS,
+				Payload: map[string]interface{}{
+					"role": role,
+				},
+			}
+
+			var reply message.Reply
+			err := message.SendMessage(value, "Node.GetAllSecrets", request, &reply)
+			if err != nil {
+				return ctx.JSON(http.StatusInternalServerError, &api.Response{
+					Success: false,
+					Error:   "One of the node is down ${n.Pid} ",
+				})
+			} else {
+				replyPayload := reply.Payload.(map[string]interface{})
+				dataPayload := replyPayload["data"].([]secret.Secret)
+
+				// Append all the data in the  replies into the global variable listOSecrets
+				listOSecrets = append(listOSecrets, dataPayload...)
+				print("This list of secret is growing")
+				print(listOSecrets)
+			}
+		}
+	}
+
+	// Send listOSecrets to client
 	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
 		Error:   "",
 		Data: map[string]interface{}{
 			"role": role,
-			"data": []*secret.Secret{
-				{
-					Role:  2,
-					Value: "Sample secret",
-					Alias: "It is a sample secret",
-				},
-			},
+			"data": listOSecrets,
 		},
 	})
 }
