@@ -138,46 +138,6 @@ func (n *Node) PerformEventualReplication(request *message.Request, reply *messa
 	return nil
 }
 
-// Coordintor send message to
-// DeleteSecret deletes a secret - this is for owner node
-// func (n *Node) DeleteSecret(request *message.Request, reply *message.Reply) error {
-// 	config, err := config.GetConfig()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	replicationFactor := config.ConfigNode.ReplicationFactor
-// 	payload := request.Payload.(map[string]interface{})
-// 	keyToDelete := strconv.Itoa(payload["key"].(int))
-// 	myLocation := payload["location"].(int)
-// 	err = secret.UpdateSecret(n.Pid, keyToDelete, nil)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	// get the next three locations of replicas
-// 	relayVirtualNodes, err := n.getRelayVirtualNodes(myLocation)
-// 	log.Printf("Relay Virtual Nodes: %v\n", relayVirtualNodes)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	// relay deletion
-// 	err = n.relaySecretDeletion(replicationFactor, keyToDelete, relayVirtualNodes)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	*reply = message.Reply{
-// 		From:    n.Pid,
-// 		To:      request.From,
-// 		ReplyTo: request.Code,
-// 		Payload: map[string]interface{}{
-// 			"success": true,
-// 		},
-// 	}
-
-// 	log.Printf("Node %d deleted secret [%s] successfully!\n", n.Pid, keyToDelete)
-// 	return nil
-// }
-
 func (n *Node) DeleteSecret(request *message.Request, reply *message.Reply) error {
 	payload := request.Payload.(map[string]interface{})
 	keyToDelete := strconv.Itoa(payload["key"].(int))
