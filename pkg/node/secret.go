@@ -126,7 +126,7 @@ func (n *Node) putSecret(ctx echo.Context) error {
 
 	payload := reply.Payload.(map[string]interface{})
 	if payload["success"].(bool) {
-		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+		return ctx.JSON(http.StatusOK, &api.Response{
 			Success: true,
 		})
 	} else {
