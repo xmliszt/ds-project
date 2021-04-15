@@ -7,7 +7,6 @@ import (
 	"syscall"
 
 	"github.com/xmliszt/e-safe/config"
-	"github.com/xmliszt/e-safe/pkg/file"
 	"github.com/xmliszt/e-safe/pkg/message"
 	"github.com/xmliszt/e-safe/pkg/secret"
 )
@@ -235,38 +234,21 @@ func (n *Node) GetAllSecrets(request *message.Request, reply *message.Reply) err
 	requestPayload := request.Payload.(map[string]interface{})
 	role := requestPayload["role"].(int)
 
-	// Get all the secrets from the physical node
-	// Look through all secrets to see if they are >= the role in secret
 	var listOSecrets []*secret.Secret
-	allData, fileError := file.ReadDataFile(n.Pid)
-	if fileError != nil {
-		return fileError
+	listOSecrets, getSecretsError := secret.GetAllNodeSecrets(n.Pid,role)
+	if getSecretsError != nil {
+		return getSecretsError
 	} else {
-
-		for _, val := range allData {
-			if val != nil {
-				secretMap := val.(map[string]interface{})
-				if role <= int(secretMap["Role"].(float64)) {
-
-					secretToSend := &secret.Secret{
-						Alias: secretMap["Alias"].(string),
-						Role:  int(secretMap["Role"].(float64)),
-						Value: secretMap["Value"].(string),
-					}
-					listOSecrets = append(listOSecrets, secretToSend)
-				}
+			*reply = message.Reply{
+				From:    n.Pid,
+				To:      request.From,
+				ReplyTo: request.Code,
+				Payload: map[string]interface{}{
+					"data": listOSecrets,
+				},
 			}
-		}
-
-		*reply = message.Reply{
-			From:    n.Pid,
-			To:      request.From,
-			ReplyTo: request.Code,
-			Payload: map[string]interface{}{
-				"data": listOSecrets,
-			},
-		}
 	}
+
 	return nil
 }
 
