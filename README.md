@@ -17,6 +17,16 @@ To start as a Node:
 go run cmd/e-safe/main.go -node
 ```
 
+To start the front-end web application:
+
+```
+cd client
+npm install
+npm run serve
+```
+
+Visit the website at: `localhost:8080`
+
 ## Demo
 
 ![](./doc/demo.gif)
