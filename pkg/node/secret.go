@@ -388,6 +388,7 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 
 	// Global variable listOSecrets := []*secret.Secret
 	var listOSecrets []secret.Secret
+	var listODeadNodes []int
 	// for all physical nodes in the ring
 	for key, value := range n.RpcMap {
 		// Check each physical node's heartbeat
@@ -406,10 +407,9 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 			var reply message.Reply
 			err := message.SendMessage(value, "Node.GetAllSecrets", request, &reply)
 			if err != nil {
-				return ctx.JSON(http.StatusInternalServerError, &api.Response{
-					Success: false,
-					Error:   "One of the node is down ${n.Pid} ",
-				})
+				// This tecnhnically should not happen since we are already checking if there is a heartbeat
+				// But we add just in case
+				listODeadNodes = append(listODeadNodes,key)	
 			} else {
 				replyPayload := reply.Payload.(map[string]interface{})
 				dataPayload := replyPayload["data"].([]secret.Secret)
@@ -417,6 +417,8 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 				// Append all the data in the  replies into the global variable listOSecrets
 				listOSecrets = append(listOSecrets, dataPayload...)
 			}
+		} else {
+			listODeadNodes = append(listODeadNodes,key)
 		}
 
 	}
@@ -439,6 +441,7 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 		Data: map[string]interface{}{
 			"role": role,
 			"data": finalOutputList,
+			"deadNodes" : listODeadNodes,
 		},
 	})
 }
