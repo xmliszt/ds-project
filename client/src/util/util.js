@@ -21,14 +21,23 @@ export function getRandomColor() {
 }
 
 export function deepCompareObject(objA, objB) {
-  Object.keys(objA).forEach((k) => {
+  for (var k of Object.keys(objA)) {
     if (objA[k] !== objB[k]) {
       return false;
     }
-  });
+  }
   return true;
 }
 
 export function deepCompareArray(arrA, arrB) {
   return JSON.stringify(arrA) === JSON.stringify(arrB);
+}
+
+export function itemExistsInArray(arr, item, key) {
+  for (var e of arr) {
+    if (e[key] === item) {
+      return true;
+    }
+  }
+  return false;
 }
