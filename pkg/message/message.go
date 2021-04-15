@@ -24,6 +24,7 @@ const (
 	FETCH_REPLICA_SECRETS       = 23
 	GIVE_ME_DATA                = 24
 	DELETE_SECRET_ALL_INSTANCES = 25
+	GET_ALL_SECRETS             = 26
 )
 
 type Reply struct {
