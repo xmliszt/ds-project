@@ -12,7 +12,7 @@ func SliceRemoveInt(s []int, v int) ([]int, error) {
 			return r, nil
 		}
 	}
-	return nil, fmt.Errorf("Slice %v does not contain %v", s, v)
+	return nil, fmt.Errorf("slice %v does not contain %v", s, v)
 }
 
 // IntInSlice check if a given integer v is in the slice of integers s

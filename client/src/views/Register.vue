@@ -2,6 +2,12 @@
   <div class="register">
     <div class="register-parent-wrapper">
       <div class="home-title">
+        <img
+          src="../assets/e-safe.png"
+          width="200"
+          height="200"
+          style="margin-bottom: 2rem"
+        />
         <div class="title-text">{{ title }}</div>
         <el-tag type="info" class="subtitle">{{ subtitle }}</el-tag>
       </div>
