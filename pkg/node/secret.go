@@ -416,8 +416,6 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 
 				// Append all the data in the  replies into the global variable listOSecrets
 				listOSecrets = append(listOSecrets, dataPayload...)
-				print("This list of secret is growing")
-				print(listOSecrets)
 			}
 		}
 
@@ -427,7 +425,7 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 	duplicateMap := make(map[string]secret.Secret)
 	for _, secretValue := range listOSecrets {
 		if _, ok := duplicateMap[secretValue.Alias]; ok {
-			log.Println("dups found")
+			continue
 		} else {
 			duplicateMap[secretValue.Alias] = secretValue
 			finalOutputList = append(finalOutputList, secretValue)

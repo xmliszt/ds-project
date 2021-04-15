@@ -244,8 +244,6 @@ func (n *Node) GetAllSecrets(request *message.Request, reply *message.Reply) err
 	} else {
 
 		for _, val := range allData {
-			log.Println("this is val that is going into the for loop")
-			log.Println(val)
 			if val != nil {
 				secretMap := val.(map[string]interface{})
 				if role <= int(secretMap["Role"].(float64)) {
