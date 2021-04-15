@@ -144,7 +144,6 @@ func (n *Node) DeleteSecret(request *message.Request, reply *message.Reply) erro
 
 	deletionErr := secret.UpdateSecret(n.Pid, keyToDelete, nil)
 	if deletionErr != nil {
-		log.Println(deletionErr)
 		return deletionErr
 	}
 	return nil

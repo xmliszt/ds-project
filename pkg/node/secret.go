@@ -296,6 +296,7 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 		})
 	}
 	secretHash := int(uSecretHash)
+	var listODeadNodes []int
 
 	for key, value := range n.RpcMap {
 		// Check each physical node's heartbeat
@@ -314,16 +315,23 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 			var reply message.Reply
 			err := message.SendMessage(value, "Node.DeleteSecret", request, &reply)
 			if err != nil {
-				return ctx.JSON(http.StatusInternalServerError, &api.Response{
-					Success: false,
-					Error:   "One of the node is down ",
-				})
+				// This tecnhnically should not happen since we are already checking if there is a heartbeat
+				// But we add just in case
+				listODeadNodes = append(listODeadNodes, key)
+			}
+		} else {
+			// Check if the node that is checked is the locksmith, then don't add
+			if key != 0 {
+				listODeadNodes = append(listODeadNodes, key)
 			}
 		}
 
 	}
 	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
+		Data: map[string]interface{}{
+			"deadNodes": listODeadNodes,
+		},
 	})
 	// return nil
 }
