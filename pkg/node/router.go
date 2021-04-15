@@ -3,7 +3,6 @@ package node
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/xmliszt/e-safe/pkg/api"
 )
 
 type RouterBuilder struct{}
@@ -65,10 +64,6 @@ func (n *Node) getRouter() *echo.Echo {
 		}
 
 	}
-
-	// Views
-	router.GET("/", api.Home)
-	dashboardRouter.GET("", api.Dashboard)
 
 	return router
 }

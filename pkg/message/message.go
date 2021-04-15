@@ -16,15 +16,15 @@ const (
 	STORE_AND_REPLICATE         = 8
 	STRICT_STORE                = 9  // Take list of v.nodes and send it forward R-1 nodes
 	EVENTUAL_STORE              = 10 // Sent by the neighbouring node to the next R-1 nodes
-	STRICT_OWNER_DOWN           = 14 // When Owner is down, Sent to Strict Con Node\
-	RELAY_DELETE_SECRET         = 19
-	ACQUIRE_USER_LOCK           = 20
-	RELEASE_USER_LOCK           = 21
-	FETCH_ORIGINAL_SECRETS      = 22
-	FETCH_REPLICA_SECRETS       = 23
-	GIVE_ME_DATA                = 24
-	DELETE_SECRET_ALL_INSTANCES = 25
-	GET_ALL_SECRETS             = 26
+	STRICT_OWNER_DOWN           = 11 // When Owner is down, Sent to Strict Con Node\
+	RELAY_DELETE_SECRET         = 12
+	ACQUIRE_USER_LOCK           = 13
+	RELEASE_USER_LOCK           = 14
+	FETCH_ORIGINAL_SECRETS      = 15
+	FETCH_REPLICA_SECRETS       = 16
+	GIVE_ME_DATA                = 17
+	DELETE_SECRET_ALL_INSTANCES = 18
+	GET_ALL_SECRETS             = 19
 )
 
 type Reply struct {

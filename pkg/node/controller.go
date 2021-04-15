@@ -8,12 +8,6 @@ import (
 func (n *Node) getRoutes() []api.Route {
 	return []api.Route{
 		{
-			Method:  echo.GET,
-			Path:    "/secret",
-			Handler: n.getSecret,
-			Auth:    true,
-		},
-		{
 			Method:  echo.PUT,
 			Path:    "/secret",
 			Handler: n.putSecret,

@@ -1,7 +1,8 @@
 # E-SAFE
 
+50.041 Distributed Systems Project
+
 > A Distributed Storage Solution that allows for Identity and Access Management (IAM) and secure storage of Secrets while distributing security liability.​
-> 50.041 Distributed Systems Project
 
 ## How to run?
 
@@ -29,4 +30,4 @@ Visit the website at: `localhost:8080`
 
 ## Demo
 
-![](./doc/demo.gif)
+[Video Demo](https://www.youtube.com/watch?v=NAAIVyq9gcU&feature=youtu.be)
