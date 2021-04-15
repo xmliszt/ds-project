@@ -1,6 +1,6 @@
 <template>
   <div>
-    <SecretCreation :role="role" />
+    <SecretCreation :role="role" @refreshTable="refreshTable" />
     <div class="secret-table">
       <div class="secret-table-wrapper">
         <el-table
@@ -11,13 +11,13 @@
           v-loading="loading"
           @selection-change="handleSelectChange"
         >
-          <el-table-column type="selection" width="55"> </el-table-column>
-          <el-table-column type="index" width="50" sortable> </el-table-column>
+          <el-table-column type="index" width="80"> </el-table-column>
           <el-table-column
             prop="alias"
             label="Alias / Description"
             width="500"
             show-overflow-tooltip
+            sortable
           >
           </el-table-column>
           <el-table-column
@@ -40,6 +40,7 @@
               }}</span>
             </template>
           </el-table-column>
+          <el-table-column prop="role" sortable label="Role"></el-table-column>
           <el-table-column align="right">
             <!-- eslint-disable-next-line vue/no-unused-vars -->
             <template slot="header" slot-scope="scope">
@@ -94,7 +95,7 @@
 <script>
 import SecretCreation from "../components/SecretCreation";
 
-import { getSecrets } from "../service/secret";
+import { getSecrets, putSecret, deleteSecret } from "../service/secret";
 
 import { parseJwt } from "../util/util";
 export default {
@@ -127,11 +128,47 @@ export default {
     },
     handleEditDone(row) {
       row.edit = false;
-      //TODO: call update secret API
+      putSecret(row.alias, row.value, this.role).then((result) => {
+        if (result.success) {
+          this.$message.success("Secret has been updated!");
+        } else {
+          this.$message.error(
+            "Failed to update the secret: " + result.error.response.data.Error
+          );
+        }
+      });
     },
     handleDelete(row) {
-      console.log(row);
-      //TODO: call delete secret API
+      this.$confirm("Are you sure to delete this secret?").then(() => {
+        deleteSecret(row.alias).then((result) => {
+          if (result.success) {
+            this.$message.success("Secret has been deleted!");
+            this.refreshTable();
+          } else {
+            this.$message.error(
+              "Failed to delete the secret: " + result.error.response.data.Error
+            );
+          }
+        });
+      });
+    },
+    refreshTable() {
+      this.loading = true;
+      getSecrets().then((result) => {
+        if (result.success) {
+          this.secretsData = result.data;
+          if (result.deadNodes.length > 0) {
+            result.deadNodes.forEach((nid) => {
+              this.$message.warning(`Physical Node ${nid} is down!`);
+            });
+          }
+        } else {
+          this.$message.error(
+            "Failed to fetch secrets: " + result.error.response.data.Error
+          );
+        }
+      });
+      this.loading = false;
     },
   },
   created() {
@@ -142,17 +179,7 @@ export default {
     }
     var json = parseJwt(jwt);
     this.role = json.role;
-    this.loading = true;
-    getSecrets(this.role).then((result) => {
-      if (result.success) {
-        this.secretsData = result.data;
-      } else {
-        this.$message.error(
-          "Failed to fetch secrets: " + result.error.response.data.Error
-        );
-      }
-    });
-    this.loading = false;
+    this.refreshTable();
   },
   computed: {
     filteredData() {

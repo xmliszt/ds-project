@@ -40,13 +40,16 @@
         </el-form-item>
       </el-form>
       <span slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">Confirm</el-button>
+        <el-button type="success" @click="submitForm">Create</el-button>
       </span>
     </el-dialog>
   </div>
 </template>
 
 <script>
+import { putSecret, getSecrets } from "../service/secret";
+import { itemExistsInArray } from "../util/util";
+
 export default {
   props: ["role"],
   data() {
@@ -80,21 +83,44 @@ export default {
       this.showCreateSecretDialog = true;
     },
     closeCreateSecretDialog() {
-      this.$confirm("Are you sure to abort creation?")
-        .then(() => {
-          this.showCreateSecretDialog = false;
-        })
-        .catch(() => {
-          this.$message.error("You cancelled secret creation.");
-          this.showCreateSecretDialog = false;
-        });
+      this.$confirm("Are you sure to abort creation?").then(() => {
+        this.$message.error("You cancelled secret creation.");
+        this.showCreateSecretDialog = false;
+      });
     },
     submitForm() {
       this.$refs["secretForm"].validate((valid) => {
         if (valid) {
-          //TODO: create a secret
-          console.log("Create a secret");
-          this.showCreateSecretDialog = false;
+          getSecrets().then((result) => {
+            if (result.success) {
+              var secrets = result.data;
+              var exist = itemExistsInArray(secrets, this.form.alias, "alias");
+              if (exist) {
+                this.$message.error(
+                  "The alias / description already exists! Please change your alias / description!"
+                );
+              } else {
+                putSecret(this.form.alias, this.form.value, this.role).then(
+                  (result) => {
+                    if (result.success) {
+                      this.$message.success("New secret has been created!");
+                      this.showCreateSecretDialog = false;
+                      this.$emit("refreshTable");
+                    } else {
+                      this.$message.error(
+                        "Failed to create new secret: " +
+                          result.error.response.data.Error
+                      );
+                    }
+                  }
+                );
+              }
+            } else {
+              this.$message.error(
+                "Failed to check secrets: " + result.error.response.data.Error
+              );
+            }
+          });
         } else {
           return false;
         }
