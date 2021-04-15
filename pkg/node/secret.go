@@ -126,7 +126,7 @@ func (n *Node) putSecret(ctx echo.Context) error {
 
 	payload := reply.Payload.(map[string]interface{})
 	if payload["success"].(bool) {
-		return ctx.JSON(http.StatusInternalServerError, &api.Response{
+		return ctx.JSON(http.StatusOK, &api.Response{
 			Success: true,
 		})
 	} else {
@@ -276,7 +276,6 @@ func (n *Node) getSecret(ctx echo.Context) error {
 	// })
 }
 
-// Delete a secret
 func (n *Node) deleteSecret(ctx echo.Context) error {
 	alias := ctx.QueryParam("alias")
 	if len(alias) < 1 {
@@ -297,83 +296,44 @@ func (n *Node) deleteSecret(ctx echo.Context) error {
 		})
 	}
 	secretHash := int(uSecretHash)
+	var listODeadNodes []int
 
-	var targetLocation int
-	for _, loc := range n.VirtualNodeLocation {
-		if loc > secretHash {
-			targetLocation = loc
-			break
-		}
-	}
+	for key, value := range n.RpcMap {
+		// Check each physical node's heartbeat
+		if n.checkHeartbeat(key) {
 
-	targetNodeID, err := getPhysicalNodeID(n.VirtualNodeMap[targetLocation])
-	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, &api.Response{
-			Success: false,
-			Error:   err.Error(),
-			Data:    nil,
-		})
-	}
+			// Send each physical node a message asking for all secrets within that role's scope
+			request := &message.Request{
+				From: n.Pid,
+				To:   key,
+				Code: message.DELETE_SECRET_ALL_INSTANCES,
+				Payload: map[string]interface{}{
+					"key": secretHash,
+				},
+			}
 
-	targetNodeAddr := n.RpcMap[targetNodeID]
-
-	request := &message.Request{
-		From: n.Pid,
-		To:   targetNodeID,
-		Code: message.DELETE_SECRET,
-		Payload: map[string]interface{}{
-			"key":      secretHash,
-			"location": targetLocation,
-		},
-	}
-
-	var reply message.Reply
-	err = message.SendMessage(targetNodeAddr, "Node.DeleteSecret", request, &reply)
-	if err != nil {
-		// When owner node is down, we still need to try delete all replicas
-		relayVirtualNodes, err := n.getRelayVirtualNodes(targetLocation)
-		if err != nil {
-			return ctx.JSON(http.StatusInternalServerError, &api.Response{
-				Success: false,
-				Error:   err.Error(),
-				Data:    nil,
-			})
-		}
-		config, err := config.GetConfig()
-		if err != nil {
-			return ctx.JSON(http.StatusInternalServerError, &api.Response{
-				Success: false,
-				Error:   err.Error(),
-				Data:    nil,
-			})
-		}
-		err = n.relaySecretDeletion(config.ConfigNode.ReplicationFactor, strconv.Itoa(secretHash), relayVirtualNodes)
-		if err != nil {
-			return ctx.JSON(http.StatusInternalServerError, &api.Response{
-				Success: false,
-				Error:   err.Error(),
-				Data:    nil,
-			})
-		}
-		return ctx.JSON(http.StatusOK, &api.Response{
-			Success: true,
-		})
-	} else {
-		replyPayload := reply.Payload.(map[string]interface{})
-		success := replyPayload["success"].(bool)
-		if success {
-			return ctx.JSON(http.StatusOK, &api.Response{
-				Success: true,
-			})
+			var reply message.Reply
+			err := message.SendMessage(value, "Node.DeleteSecret", request, &reply)
+			if err != nil {
+				// This tecnhnically should not happen since we are already checking if there is a heartbeat
+				// But we add just in case
+				listODeadNodes = append(listODeadNodes, key)
+			}
 		} else {
-			err := replyPayload["error"].(error)
-			return ctx.JSON(http.StatusInternalServerError, &api.Response{
-				Success: false,
-				Error:   err.Error(),
-				Data:    nil,
-			})
+			// Check if the node that is checked is the locksmith, then don't add
+			if key != 0 {
+				listODeadNodes = append(listODeadNodes, key)
+			}
 		}
+
 	}
+	return ctx.JSON(http.StatusOK, &api.Response{
+		Success: true,
+		Data: map[string]interface{}{
+			"deadNodes": listODeadNodes,
+		},
+	})
+	// return nil
 }
 
 // Get all secrets under a role
