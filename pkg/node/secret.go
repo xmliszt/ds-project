@@ -384,10 +384,10 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 	role, _ := strconv.Atoi(claims["role"].(string))
 
 	fmt.Println("User role is: ", role)
-	var finalOutputList []secret.Secret
+	var finalOutputList []*secret.Secret
 
 	// Global variable listOSecrets := []*secret.Secret
-	var listOSecrets []secret.Secret
+	var listOSecrets []*secret.Secret
 	var listODeadNodes []int
 	// for all physical nodes in the ring
 	for key, value := range n.RpcMap {
@@ -409,16 +409,19 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 			if err != nil {
 				// This tecnhnically should not happen since we are already checking if there is a heartbeat
 				// But we add just in case
-				listODeadNodes = append(listODeadNodes,key)	
+				listODeadNodes = append(listODeadNodes, key)
 			} else {
 				replyPayload := reply.Payload.(map[string]interface{})
-				dataPayload := replyPayload["data"].([]secret.Secret)
+				dataPayload := replyPayload["data"].([]*secret.Secret)
 
 				// Append all the data in the  replies into the global variable listOSecrets
 				listOSecrets = append(listOSecrets, dataPayload...)
 			}
 		} else {
-			listODeadNodes = append(listODeadNodes,key)
+			// Check if the node that is checked is the locksmith, then don't add
+			if key != 0 {
+				listODeadNodes = append(listODeadNodes, key)
+			}
 		}
 
 	}
@@ -429,7 +432,7 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 		if _, ok := duplicateMap[secretValue.Alias]; ok {
 			continue
 		} else {
-			duplicateMap[secretValue.Alias] = secretValue
+			duplicateMap[secretValue.Alias] = *secretValue
 			finalOutputList = append(finalOutputList, secretValue)
 		}
 	}
@@ -439,9 +442,9 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 		Success: true,
 		Error:   "",
 		Data: map[string]interface{}{
-			"role": role,
-			"data": finalOutputList,
-			"deadNodes" : listODeadNodes,
+			"role":      role,
+			"data":      finalOutputList,
+			"deadNodes": listODeadNodes,
 		},
 	})
 }

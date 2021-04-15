@@ -237,7 +237,7 @@ func (n *Node) GetAllSecrets(request *message.Request, reply *message.Reply) err
 
 	// Get all the secrets from the physical node
 	// Look through all secrets to see if they are >= the role in secret
-	var listOSecrets []secret.Secret
+	var listOSecrets []*secret.Secret
 	allData, fileError := file.ReadDataFile(n.Pid)
 	if fileError != nil {
 		return fileError
@@ -248,7 +248,7 @@ func (n *Node) GetAllSecrets(request *message.Request, reply *message.Reply) err
 				secretMap := val.(map[string]interface{})
 				if role <= int(secretMap["Role"].(float64)) {
 
-					secretToSend := secret.Secret{
+					secretToSend := &secret.Secret{
 						Alias: secretMap["Alias"].(string),
 						Role:  int(secretMap["Role"].(float64)),
 						Value: secretMap["Value"].(string),

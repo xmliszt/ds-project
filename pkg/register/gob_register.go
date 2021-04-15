@@ -14,7 +14,7 @@ var (
 	virtualNodeData = map[string]interface{}{}
 	secretType      = secret.Secret{}
 	secretsMap      = map[string]*secret.Secret{}
-	secretsList     = []secret.Secret{}
+	secretsList     = []*secret.Secret{}
 )
 
 func Regsiter() {
