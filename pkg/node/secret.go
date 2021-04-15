@@ -344,20 +344,67 @@ func (n *Node) getAllSecrets(ctx echo.Context) error {
 	role, _ := strconv.Atoi(claims["role"].(string))
 
 	fmt.Println("User role is: ", role)
+	var finalOutputList []*secret.Secret
 
-	// Handle get all secrets
+	// Global variable listOSecrets := []*secret.Secret
+	var listOSecrets []*secret.Secret
+	var listODeadNodes []int
+	// for all physical nodes in the ring
+	for key, value := range n.RpcMap {
+		// Check each physical node's heartbeat
+		if n.checkHeartbeat(key) {
+
+			// Send each physical node a message asking for all secrets within that role's scope
+			request := &message.Request{
+				From: n.Pid,
+				To:   key,
+				Code: message.GET_ALL_SECRETS,
+				Payload: map[string]interface{}{
+					"role": role,
+				},
+			}
+
+			var reply message.Reply
+			err := message.SendMessage(value, "Node.GetAllSecrets", request, &reply)
+			if err != nil {
+				// This tecnhnically should not happen since we are already checking if there is a heartbeat
+				// But we add just in case
+				listODeadNodes = append(listODeadNodes, key)
+			} else {
+				replyPayload := reply.Payload.(map[string]interface{})
+				dataPayload := replyPayload["data"].([]*secret.Secret)
+
+				// Append all the data in the  replies into the global variable listOSecrets
+				listOSecrets = append(listOSecrets, dataPayload...)
+			}
+		} else {
+			// Check if the node that is checked is the locksmith, then don't add
+			if key != 0 {
+				listODeadNodes = append(listODeadNodes, key)
+			}
+		}
+
+	}
+
+	// Check for dupllicates
+	duplicateMap := make(map[string]secret.Secret)
+	for _, secretValue := range listOSecrets {
+		if _, ok := duplicateMap[secretValue.Alias]; ok {
+			continue
+		} else {
+			duplicateMap[secretValue.Alias] = *secretValue
+			finalOutputList = append(finalOutputList, secretValue)
+		}
+	}
+
+	// Send listOSecrets to client
 	return ctx.JSON(http.StatusOK, &api.Response{
 		Success: true,
 		Error:   "",
 		Data: map[string]interface{}{
-			"role": role,
-			"data": []*secret.Secret{
-				{
-					Role:  2,
-					Value: "Sample secret",
-					Alias: "It is a sample secret",
-				},
-			},
+			"role":      role,
+			"data":      finalOutputList,
+			"deadNodes": listODeadNodes,
 		},
 	})
 }

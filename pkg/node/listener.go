@@ -201,6 +201,28 @@ func (n *Node) GetSecrets(request *message.Request, reply *message.Reply) error 
 	return nil
 }
 
+func (n *Node) GetAllSecrets(request *message.Request, reply *message.Reply) error {
+	requestPayload := request.Payload.(map[string]interface{})
+	role := requestPayload["role"].(int)
+
+	var listOSecrets []*secret.Secret
+	listOSecrets, getSecretsError := secret.GetAllNodeSecrets(n.Pid,role)
+	if getSecretsError != nil {
+		return getSecretsError
+	} else {
+			*reply = message.Reply{
+				From:    n.Pid,
+				To:      request.From,
+				ReplyTo: request.Code,
+				Payload: map[string]interface{}{
+					"data": listOSecrets,
+				},
+			}
+	}
+
+	return nil
+}
+
 func (n *Node) PerformStrictDown(request *message.Request, reply *message.Reply) error {
 	config, err := config.GetConfig()
 	fmt.Println("start the strict down")

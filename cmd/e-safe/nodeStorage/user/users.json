@@ -1,0 +1,17 @@
+{
+ "2261164244": {
+  "Password": "7cbf88c1c690e305392bb9d3932c51af90e52e87ecf09aa1a80010f1b2d8a4c286",
+  "Role": 5,
+  "Username": "bob"
+ },
+ "2267157479": {
+  "Password": "97e4618e3affe9fa1ba3593248ae657747619279192a38862d9eefb89cd5d4608e4a",
+  "Role": 1,
+  "Username": "alice"
+ },
+ "2933180226": {
+  "Username": "Aaron",
+  "Password": "ca5113c9ea17efccc4e2d25f64803f1abf837043fb27e946fd321601553ea9a65f",
+  "Role": 2
+ }
+}

@@ -64,6 +64,33 @@ func GetSecret(pid int, id string) (*Secret, error) {
 
 }
 
+// Get all the secrets from the physical node
+// Look through all secrets to see if they are >= the role in secret
+func GetAllNodeSecrets(pid int, role int) ([]*Secret, error){
+	var listOSecrets []*Secret
+	allData, fileError := file.ReadDataFile(pid)
+	if fileError != nil {
+		return nil, fileError
+	} else {
+
+		for _, val := range allData {
+			if val != nil {
+				secretMap := val.(map[string]interface{})
+				if role <= int(secretMap["Role"].(float64)) {
+
+					secretToSend := &Secret{
+						Alias: secretMap["Alias"].(string),
+						Role:  int(secretMap["Role"].(float64)),
+						Value: secretMap["Value"].(string),
+					}
+					listOSecrets = append(listOSecrets, secretToSend)
+				}
+			}
+		}
+	}
+	return listOSecrets,nil
+}
+
 // GetSecrets returns secrets available within the range given
 func GetSecrets(pid int, from int, to int) (map[string]*Secret, error) {
 	allData, fileError := file.ReadDataFile(pid)
