@@ -3,30 +3,35 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	ConfigServer `yaml:"Server"`
-	ConfigNode `yaml:"Node"`
-	ConfigTimeout `yaml:"Timeout"`
+	ConfigServer    `yaml:"Server"`
+	ConfigNode      `yaml:"Node"`
+	ConfigLocksmith `yaml:"Locksmith"`
 }
 
 type ConfigServer struct {
-	Host string `yaml:"Host"`
+	Secret string `yaml:"Secret"`
+	Host   string `yaml:"Host"`
+	Port   int    `yaml:"Port"`
+}
+
+type ConfigLocksmith struct {
 	Port int `yaml:"Port"`
 }
 
 type ConfigNode struct {
-	Number int `yaml:"Number"`
-	HeartbeatInterval int `yaml:"HeartbeatInterval"`
-}
-
-type ConfigTimeout struct {
-	HeartBeatTimeout int `yaml:"HeartbeatTimeout"`
-	NodeCreationTimeout int `yaml:"NodeCreationTimeout"`
+	HeartbeatInterval          int `yaml:"HeartbeatInterval"`
+	CoordinatorMonitorInterval int `yaml:"CoordinatorMonitorInterval"`
+	VirtualNodesCount          int `yaml:"VirtualNodesCount"`
+	ReplicationFactor          int `yaml:"ReplicationFactor"`
+	NumberOfHashing            int `yaml:"NumberOfHashing"`
 }
 
 // LoadConfig loads the config from YAML file and return the config object
@@ -38,7 +43,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 	defer file.Close()
-	
+
 	d := yaml.NewDecoder(file)
 
 	if err := d.Decode(&cfg); err != nil {
@@ -58,11 +63,11 @@ func GetConfig() (*Config, error) {
 		lock.Lock()
 		defer lock.Unlock()
 		if globalConfig == nil {
-			cwd, err := os.Getwd()
-			if err != nil {
-				return nil, err
-			}
-			configPath := filepath.Join(cwd, "config.yaml")
+			_, file, _, _ := runtime.Caller(0)
+			paths := strings.Split(file, "/")
+			paths = paths[:len(paths)-2]
+			rootPath := "/" + filepath.Join(paths...)
+			configPath := filepath.Join(rootPath, "config.yaml")
 			config, err := LoadConfig(configPath)
 			if err != nil {
 				return nil, err

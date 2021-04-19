@@ -1,10 +1,12 @@
 Server:
-  Host: localhost
-  Port: 8080
+  Secret: ~!@e-safe2021 # App secret, used to encrypt and decrypt password
+  Host: localhost # Server host
+  Port: 8081 # Server port
+Locksmith:
+  Port: 5000 # Locksmith RPC port
 Node:
-  Number: 5 # Number of Nodes to initialize by Locksmith Server
-  HeartbeatInterval: 5 # check heartbeat every n seconds
-Timeout:
-  HeartbeatTimeout: 15 # in seconds, if after this duration still do not receive heartbeat reply, deem the node as dead
-  NodeCreationTimeout: 60 # in seconds, resume heartbeat checking for this node after this timeout over
-
+  HeartbeatInterval: 2 # check heartbeat every n seconds
+  CoordinatorMonitorInterval: 1 # check and update coordinator every n seconds
+  VirtualNodesCount: 3 # Number of virtual nodes for each node
+  ReplicationFactor: 3 # Number of replication to perform
+  NumberOfHashing: 3 # The number of time consistent hashing is performed recursively
